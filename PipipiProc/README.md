@@ -1,3 +1,5 @@
+This processor is used to search for pi+pi-pi0 + ISR background.
+
 This is the README file for PipipiProc. It shows you how to write
 a Processor in the new CLEO3 Suez environment.
 
