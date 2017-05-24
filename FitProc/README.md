@@ -1,3 +1,5 @@
+This is the main processor.
+
 This is the README file for FitProc. It shows you how to write
 a Processor in the new CLEO3 Suez environment.
 
@@ -40,4 +42,3 @@ suez> exit
  Please read the documentation: 
      http://w4.lns.cornell.edu/restricted/CLEO/CLEO3/soft/index.html
 
- That's It! Questions, Suggestions, Complaints --> Martin Lohner
