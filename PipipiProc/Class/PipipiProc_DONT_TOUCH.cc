@@ -1,7 +1,7 @@
 // -*- C++ -*-
 //
-// Package:     Bin50_JpsiPiPiProc
-// Module:      Bin50_JpsiPiPiProc_DONT_TOUCH
+// Package:     PipipiProc
+// Module:      PipipiProc_DONT_TOUCH
 // 
 // Description: DONT TOUCH THIS FILE
 //
@@ -9,8 +9,8 @@
 //
 // Implementation:
 //
-// Author:      Sean Dobbs
-// Created:     Wed Jul  7 17:32:00 EDT 2004
+// Author:      pts/14
+// Created:     Wed Apr  7 11:35:17 CDT 2010
 // $Id$
 //
 // Revision history
@@ -25,7 +25,7 @@
 #endif /* AMBIGUOUS_STRING_FUNCTIONS_BUG */            
 
 // user include files
-#include "Bin50_JpsiPiPiProc/Bin50_JpsiPiPiProc.h"
+#include "PipipiProc/PipipiProc.h"
 #include "Processor/Action.h"                
 
 // STL classes
@@ -35,7 +35,7 @@
 //
 // ---- cvs-based strings (Id and Tag with which file was checked out)
 static const char* const kIdString  = "$Id: processor_DONT_TOUCH.cc,v 1.5 1998/12/01 21:11:58 mkl Exp $";
-static const char* const kTagString = "$Name: v06_08_00 $";
+static const char* const kTagString = "$Name: v07_03_00 $";
 
 //
 // function definitions
@@ -50,11 +50,11 @@ static const char* const kTagString = "$Name: v06_08_00 $";
 //
 // ---------------- binding method to stream -------------------
 void
-Bin50_JpsiPiPiProc::bind(
-   ActionBase::ActionResult (Bin50_JpsiPiPiProc::*iMethod)( Frame& ),
+PipipiProc::bind(
+   ActionBase::ActionResult (PipipiProc::*iMethod)( Frame& ),
    const Stream::Type& iStream )
 {
-   bindAction( iStream, new Action<Bin50_JpsiPiPiProc>( iMethod, this ) );
+   bindAction( iStream, new Action<PipipiProc>( iMethod, this ) );
 }
 
 //

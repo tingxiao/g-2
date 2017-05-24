@@ -1,20 +1,20 @@
 // -*- C++ -*-
 //
-// Package:     Bin50_JpsiPiPiProc
-// Module:      Bin50_JpsiPiPiProc_DONT_TOUCH2
+// Package:     PipipiProc
+// Module:      PipipiProc_DONT_TOUCH2
 // 
 // Description: DONT TOUCH THIS FILE!
 //
-//              Factory method to create processor Bin50_JpsiPiPiProc:
-//              creates a new Bin50_JpsiPiPiProc instance each time 
+//              Factory method to create processor PipipiProc:
+//              creates a new PipipiProc instance each time 
 //              it is called; it is used by Suez 
 //              to create a Processor after loading in 
 //              the code from a shared library.
 //
 // Implementation:
 //
-// Author:      Sean Dobbs
-// Created:     Wed Jul  7 17:32:00 EDT 2004
+// Author:      pts/14
+// Created:     Wed Apr  7 11:35:17 CDT 2010
 // $Id$
 //
 // Revision history
@@ -29,7 +29,7 @@
 #endif             
 
 // user include files
-#include "Bin50_JpsiPiPiProc/Bin50_JpsiPiPiProc.h"
+#include "PipipiProc/PipipiProc.h"
 
 // STL classes
 #include <string>
@@ -39,7 +39,7 @@
 //
 // ---- cvs-based strings (Id and Tag with which file was checked out)
 static const char* const kIdString  = "$Id: processor_DONT_TOUCH2.cc,v 1.4 1998/12/01 21:11:59 mkl Exp $";
-static const char* const kTagString = "$Name: v06_08_00 $";
+static const char* const kTagString = "$Name: v07_03_00 $";
 
 //
 // function definitions
@@ -53,7 +53,7 @@ extern "C" {
 Processor*
 makeProcessor( void )
 {
-   return new Bin50_JpsiPiPiProc;
+   return new PipipiProc;
 }
 
 const char*

@@ -106,46 +106,34 @@ CLEO3_INCS:=	.
 #---------------------------------------
 
 USER_LIBS  :=
-CLEO3_LIBS :=   ProxyBind \
+CLEO3_LIBS :=   FitEvt \
+                CleoDChain \
+                MCInfo \
+                ProxyBind \
                 Processor \
                 CommandPattern \
-                CleoDChain \
-                FitEvt \
-                CleoDChain \
-                EventTypeProd \
-                EventType \
                 Navigation \
-                MCInfo \
-                Trkman \
-                BeamEnergy \
-                RunInfo \
-                C3Mu \
+                VXFitVeeCandidate \
+                VXFit \
                 PhotonDecays \
+                DedxInfo \
                 TrackShowerMatching \
                 C3cc \
-                RichTrackPrototypesProd \
-                RichAverageAnglesProd \
-                RichAnglesProd \
-                C3Rich \
-                DedxInfo \
                 TrackDelivery \
                 TrackRoot \
                 KinematicTrajectory \
+                LabNet4Momentum \
                 ProxyBind \
+                HistogramInterface \
+                TriggerL1DataProd \
+                TriggerL1Data \
+                Level4Proc \
+                RichAverageAnglesProd \
                 CleoDB \
                 StorageManagement \
                 DataHandler \
                 ToolBox \
-                Utility \
-                VFinderProd \
-                VXFitVeeCandidate \
-                VXFit \
-                TriggerL1DataProd \
-                TriggerL1Data \
-                Level4Proc
-
-
-
+                Utility
 
 OTHR_LIBS  :=	CLHEP
 #CLEO_LIBS  :=
