@@ -1,0 +1,69 @@
+-------------- Generation parameters -------------------------------
+150000         ------------- number of generated events
+50000         ------------- events to determine the maximum
+"out.dat"     ------------- output file
+0             ------------- printing(1), nonprinting(0) generated events
+1             ------------- Born(0), NLO(1)
+.0001d0       ------------- soft photon cutoff
+0          mu+mu-(0), pi+pi-(1), 2pi0pi+pi-(2), 2pi+2pi-(3), ppbar(4), nnbar(5), K+K-(6), K0K0bar(7), pi+pi-pi0(8), lamb(->pi-p)lambbar(->pi+pbar)(9)
+1             ------------- ISR only(0), ISR+FSR(1), ISR+INT+FSR(2) 
+1             ------------- IFSNLO: no(0), yes(1)
+1             ------------- ivac : vacuum polarization switch: off (0), on (1)
+0             ------------- tagged photons(0), untagged photons(1)
+0             ------------- FF_pion: KS PionFormFactor(0),GS PionFormFactor(1)
+0             ------------- for pi+pi- only: f0+f0(600): K+K- model(0), "no structure" model(1), no f0+f0(600)(2), f0 KLOE(3)
+-------------- Collider parameter ----------------------------------
+1.02798d0        GeV ---------- CMS-Energy
+-------------- Experimental cuts -----------------------------------
+0.d0    GeV^2 -------- minimal hadrons(muons)-gamma-inv. mass squared
+0.0447d0 GeV^2 -------- minimal inv. mass squared of the hadrons(muons)
+1.06d0    GeV^2 -------- maximal inv. mass squared of the hadrons(muons)
+0.02d0   GeV ---------- minimal photon energy/missing energy
+0.d0    grad --------- minimal photon angle/missing momentum angle
+180.d0  grad --------- maximal photon angle/missing momentum angle 
+0.d0    grad --------- minimal pions(muons,nucleons,kaons) angle 
+180.d0  grad --------- maximal pions(muons,nucleons,kaons) angle
+-------------- Histograms ------------------------------------------
+" "                  --------- title
+0.0447d0, 1.06d0, 100     --------- histogram limits and number of bins
+" "
+0.0447d0, 1.06d0, 100
+" "
+2.3d0, 3.3d0, 10
+" "
+2.3d0, 3.3d0, 10
+" "
+2.3d0, 3.3d0, 10
+" "
+2.3d0, 3.3d0, 10
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+" "
+0.28d0, 1.5d0, 200
+-----------------------------------------------------------
+
+ 

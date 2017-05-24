@@ -1,0 +1,1257 @@
+// -*- C++ -*-
+//
+// Package:     TwoTracksISRProc
+// Module:      TwoTracksISRProc
+// 
+// Description: 1 shower & 2 tracks
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      Ting Xiao
+// Created:     Fri Jun 26 18:02:00 EDT 2009
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "TwoTracksISRProc/TwoTracksISRProc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+#include "HistogramInterface/HINtupleVarNames.h"
+#include "HistogramInterface/HINtupleArray.h"
+#include "HistogramInterface/HIHist1D.h"
+
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+#include "Navigation/NavShowerServer.h"
+#include "C3ccProd/CcFortranShowerCorrector.h"
+#include "C3Mu/MuTrack.h"
+#include "Navigation/NavMuonId.h"
+
+//I added the following at the suggestion of the NavShower web page
+#include "Navigation/NavConReg.h"
+#include "KinematicTrajectory/KTKinematicData.h"
+#include "Navigation/NavTkShMatch.h"
+#include "C3cc/CcAssignedEnergyHit.h"
+
+#include "Navigation/NavTrack.h"
+#include "TrackRoot/TRHelixFit.h"
+#include "TrackRoot/TRTrackFitQuality.h"
+#include "TrackRoot/TRSeedTrackQuality.h"
+#include "TrackDelivery/TDKinematicFit.h"
+#include "Navigation/NavElecId.h"
+
+#include "FitEvt/FitEvtSettings.h"
+#include "FitEvt/FitEvt.h"
+#include "BeamEnergy/BeamEnergy.h"
+#include "MagField/MagneticField.h"
+#include "MagField/MFFieldMap.h"
+#include "BeamSpot/BeamSpot.h"
+
+#include "CleoDB/DBEventHeader.h" 
+#include "TriggerData/TriggerData.h"
+#include "TriggerL1Data/TriggerL1Data.h" 
+#include "RawData/RawTrigger.h"
+#include "RawData/RawEventData.h"
+#include "RawData/RawDataItr.h"
+#include "Level4Proc/Level4Decision.h"
+
+//RICH example
+#include "Navigation/NavRich.h"
+//Dedx example
+#include "DedxInfo/DedxInfo.h"
+
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.TwoTracksISRProc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.41 2006/02/08 19:38:02 wsun Exp $";
+static const char* const kTagString = "$Name: v07_03_00 $";
+
+//
+// static data member definitions
+//
+
+
+
+//
+// constructors and destructor
+//
+TwoTracksISRProc::TwoTracksISRProc( void )               // anal1
+   : Processor( "TwoTracksISRProc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &TwoTracksISRProc::event,    Stream::kEvent );
+   bind( &TwoTracksISRProc::beginRun, Stream::kBeginRun );
+   //bind( &TwoTracksISRProc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+TwoTracksISRProc::~TwoTracksISRProc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+TwoTracksISRProc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+TwoTracksISRProc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+
+enum {knshower,
+chisqvpi,chisqfpi, //chisq of pion fit
+chisqvmu,chisqfmu,    // chisq of muon fit
+chisqvk,chisqfk,      // chisq of kaon fit
+e1,th1,phi1,e9251,       // unfitted photon energy
+e2,th2,phi2,e9252,
+e3,th3,phi3,e9253,
+e4,th4,phi4,e9254,
+e5,th5,phi5,e9255,
+e6,th6,phi6,e9256,
+e7,th7,phi7,e9257,
+e8,th8,phi8,e9258,
+e9,th9,phi9,e9259,
+e10,th10,phi10,e92510,
+me1,eop1,me2,eop2,  //matched energy and E/p
+mudepth1,mudepth2,  //muon depth 
+
+fepi,fthpi,fphipi,  // fitted photon energy fitted with pions
+femu,fthmu,fphimu,  // fitted photon energy fitted with muons
+fek,fthk,fphik,   // fitted photon energy fitted with kaons
+
+pite1,pipx1,pipy1,pipz1,mute1,mupx1,mupy1,mupz1,kte1,kpx1,kpy1,kpz1,
+pisigma1,musigma1,pill1,mull1,ksigma1,kll1,
+pite2,pipx2,pipy2,pipz2,mute2,mupx2,mupy2,mupz2,kte2,kpx2,kpy2,kpz2,
+pisigma2,musigma2,pill2,mull2,ksigma2,kll2,
+fpite1,fpipx1,fpipy1,fpipz1,fmute1,fmupx1,fmupy1,fmupz1,fkte1,fkpx1,fkpy1,fkpz1,
+fpite2,fpipx2,fpipy2,fpipz2,fmute2,fmupx2,fmupy2,fmupz2,fkte2,fkpx2,fkpy2,fkpz2,
+
+charge1, charge2, //charges of the 2 tracks
+beam_e, // beam energy
+m_trk,  //track mass variable
+
+l1trigger1,l1trigger2,l1trigger3,l1trigger4,l1trigger5,l1trigger6,l1trigger7,l1trigger8,
+l1trigger9,l1trigger10,l1trigger11,l1trigger12,l1trigger13,l1trigger14,l1trigger15,l1trigger16,
+
+l1bucket, cbbucket, cebucket, trbucket, lubucket,
+kVarNum};
+
+void
+TwoTracksISRProc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+   HINtupleVarNames ntupleNames(kVarNum);
+
+   ntupleNames.addVar(knshower,       "knshower");
+
+   ntupleNames.addVar(chisqvpi,       "chisqvpi");
+   ntupleNames.addVar(chisqfpi,       "chisqfpi");
+
+   ntupleNames.addVar(chisqvmu,       "chisqvmu");
+   ntupleNames.addVar(chisqfmu,       "chisqfmu");
+
+   ntupleNames.addVar(chisqvk,       "chisqvk");
+   ntupleNames.addVar(chisqfk,       "chisqfk");
+
+   ntupleNames.addVar(e1,          "e1");
+   ntupleNames.addVar(th1,        "th1");
+   ntupleNames.addVar(phi1,       "phi1");
+   ntupleNames.addVar(e9251,    "e9251");
+
+   ntupleNames.addVar(e2,          "e2");
+   ntupleNames.addVar(th2,        "th2");
+   ntupleNames.addVar(phi2,       "phi2");
+   ntupleNames.addVar(e9252,    "e9252");
+
+   ntupleNames.addVar(e3,          "e3");
+   ntupleNames.addVar(th3,        "th3");
+   ntupleNames.addVar(phi3,       "phi3");
+   ntupleNames.addVar(e9253,    "e9253");
+
+   ntupleNames.addVar(e4,          "e4");
+   ntupleNames.addVar(th4,        "th4");
+   ntupleNames.addVar(phi4,       "phi4");
+   ntupleNames.addVar(e9254,    "e9254");
+
+   ntupleNames.addVar(e5,          "e5");
+   ntupleNames.addVar(th5,        "th5");
+   ntupleNames.addVar(phi5,       "phi5");
+   ntupleNames.addVar(e9255,    "e9255");
+
+   ntupleNames.addVar(e6,          "e6");
+   ntupleNames.addVar(th6,        "th6");
+   ntupleNames.addVar(phi6,       "phi6");
+   ntupleNames.addVar(e9256,    "e9256");
+
+   ntupleNames.addVar(e7,          "e7");
+   ntupleNames.addVar(th7,        "th7");
+   ntupleNames.addVar(phi7,       "phi7");
+   ntupleNames.addVar(e9257,    "e9257");
+
+   ntupleNames.addVar(e8,          "e8");
+   ntupleNames.addVar(th8,        "th8");
+   ntupleNames.addVar(phi8,       "phi8");
+   ntupleNames.addVar(e9258,    "e9258");
+
+   ntupleNames.addVar(e9,          "e9");
+   ntupleNames.addVar(th9,        "th9");
+   ntupleNames.addVar(phi9,       "phi9");
+   ntupleNames.addVar(e9259,    "e9259");
+
+   ntupleNames.addVar(e10,          "e10");
+   ntupleNames.addVar(th10,        "th10");
+   ntupleNames.addVar(phi10,       "phi10");
+   ntupleNames.addVar(e92510,    "e92510");
+
+   ntupleNames.addVar(me1,          "me1");
+   ntupleNames.addVar(eop1,          "eop1");
+   ntupleNames.addVar(me2,          "me2");
+   ntupleNames.addVar(eop2,          "eop2");
+
+   ntupleNames.addVar(mudepth1,      "mudepth1");
+   ntupleNames.addVar(mudepth2,      "mudepth2");
+
+   ntupleNames.addVar(fepi,          "fepi");
+   ntupleNames.addVar(fthpi,        "fthpi");
+   ntupleNames.addVar(fphipi,       "fphipi");
+
+   ntupleNames.addVar(femu,          "femu");
+   ntupleNames.addVar(fthmu,        "fthmu");
+   ntupleNames.addVar(fphimu,       "fphimu");
+
+   ntupleNames.addVar(fek,          "fek");
+   ntupleNames.addVar(fthk,        "fthk");
+   ntupleNames.addVar(fphik,       "fphik");
+
+   ntupleNames.addVar(pite1,    "pite1");
+   ntupleNames.addVar(pipx1,    "pipx1");
+   ntupleNames.addVar(pipy1,    "pipy1");
+   ntupleNames.addVar(pipz1,    "pipz1");
+
+   ntupleNames.addVar(mute1,    "mute1");
+   ntupleNames.addVar(mupx1,    "mupx1");
+   ntupleNames.addVar(mupy1,    "mupy1");
+   ntupleNames.addVar(mupz1,    "mupz1");
+
+   ntupleNames.addVar(kte1,    "kte1");
+   ntupleNames.addVar(kpx1,    "kpx1");
+   ntupleNames.addVar(kpy1,    "kpy1");
+   ntupleNames.addVar(kpz1,    "kpz1");
+
+   ntupleNames.addVar(pisigma1, "pisigma1");
+   ntupleNames.addVar(musigma1, "musigma1");
+   ntupleNames.addVar(ksigma1, "ksigma1");
+
+   ntupleNames.addVar(pill1,    "pill1");
+   ntupleNames.addVar(mull1,    "mull1");
+   ntupleNames.addVar(kll1,    "kll1");
+
+   ntupleNames.addVar(pite2,    "pite2");
+   ntupleNames.addVar(pipx2,    "pipx2");
+   ntupleNames.addVar(pipy2,    "pipy2");
+   ntupleNames.addVar(pipz2,    "pipz2");
+
+   ntupleNames.addVar(mute2,    "mute2");
+   ntupleNames.addVar(mupx2,    "mupx2");
+   ntupleNames.addVar(mupy2,    "mupy2");
+   ntupleNames.addVar(mupz2,    "mupz2");
+
+   ntupleNames.addVar(kte2,    "kte2");
+   ntupleNames.addVar(kpx2,    "kpx2");
+   ntupleNames.addVar(kpy2,    "kpy2");
+   ntupleNames.addVar(kpz2,    "kpz2");
+
+   ntupleNames.addVar(pisigma2, "pisigma2");
+   ntupleNames.addVar(musigma2, "musigma2");
+   ntupleNames.addVar(ksigma2, "ksigma2");
+
+   ntupleNames.addVar(pill2,    "pill2");
+   ntupleNames.addVar(mull2,    "mull2");
+   ntupleNames.addVar(kll2,    "kll2");
+
+   ntupleNames.addVar(fpite1,    "fpite1");
+   ntupleNames.addVar(fpipx1,    "fpipx1");
+   ntupleNames.addVar(fpipy1,    "fpipy1");
+   ntupleNames.addVar(fpipz1,    "fpipz1");
+   ntupleNames.addVar(fmute1,    "fmute1");
+   ntupleNames.addVar(fmupx1,    "fmupx1");
+   ntupleNames.addVar(fmupy1,    "fmupy1");
+   ntupleNames.addVar(fmupz1,    "fmupz1");
+   ntupleNames.addVar(fkte1,    "fkte1");
+   ntupleNames.addVar(fkpx1,    "fkpx1");
+   ntupleNames.addVar(fkpy1,    "fkpy1");
+   ntupleNames.addVar(fkpz1,    "fkpz1");
+
+   ntupleNames.addVar(fpite2,    "fpite2");
+   ntupleNames.addVar(fpipx2,    "fpipx2");
+   ntupleNames.addVar(fpipy2,    "fpipy2");
+   ntupleNames.addVar(fpipz2,    "fpipz2");
+   ntupleNames.addVar(fmute2,    "fmute2");
+   ntupleNames.addVar(fmupx2,    "fmupx2");
+   ntupleNames.addVar(fmupy2,    "fmupy2");
+   ntupleNames.addVar(fmupz2,    "fmupz2");
+   ntupleNames.addVar(fkte2,    "fkte2");
+   ntupleNames.addVar(fkpx2,    "fkpx2");
+   ntupleNames.addVar(fkpy2,    "fkpy2");
+   ntupleNames.addVar(fkpz2,    "fkpz2");
+
+   ntupleNames.addVar(charge1,    "charge1");
+   ntupleNames.addVar(charge2,    "charge2");
+
+   ntupleNames.addVar(beam_e,"beam_e");
+   ntupleNames.addVar(m_trk,"m_trk");
+
+   ntupleNames.addVar(l1trigger1,          "l1trigger1");
+   ntupleNames.addVar(l1trigger2,          "l1trigger2");
+   ntupleNames.addVar(l1trigger3,          "l1trigger3");
+   ntupleNames.addVar(l1trigger4,          "l1trigger4");
+   ntupleNames.addVar(l1trigger5,          "l1trigger5");
+   ntupleNames.addVar(l1trigger6,          "l1trigger6");
+   ntupleNames.addVar(l1trigger7,          "l1trigger7");
+   ntupleNames.addVar(l1trigger8,          "l1trigger8");
+   ntupleNames.addVar(l1trigger9,          "l1trigger9");
+   ntupleNames.addVar(l1trigger10,          "l1trigger10");
+   ntupleNames.addVar(l1trigger11,          "l1trigger11");
+   ntupleNames.addVar(l1trigger12,          "l1trigger12");
+   ntupleNames.addVar(l1trigger13,          "l1trigger13");
+   ntupleNames.addVar(l1trigger14,          "l1trigger14");
+   ntupleNames.addVar(l1trigger15,          "l1trigger15");
+   ntupleNames.addVar(l1trigger16,          "l1trigger16");
+
+   ntupleNames.addVar(l1bucket,"l1bucket");
+   ntupleNames.addVar(cbbucket,"cbbucket");
+   ntupleNames.addVar(cebucket,"cebucket");
+   ntupleNames.addVar(trbucket,"trbucket");
+   ntupleNames.addVar(lubucket,"lubucket");
+
+   m_showerTuple = iHistoManager.ntuple(10,"tuple", kVarNum, 10000, ntupleNames.names());
+
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+TwoTracksISRProc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   const int kMaxTrack = 2;
+   const int kMaxShower = 10;
+
+   double ChisqVpi = -10.;
+   double ChisqFpi = -10.;
+
+   double ChisqVmu = -10.;
+   double ChisqFmu = -10.;
+
+   double ChisqVk = -10.;
+   double ChisqFk = -10.;
+
+   double E[kMaxShower] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double Theta[kMaxShower] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double Phi[kMaxShower] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double E925[kMaxShower] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+
+   double ME[kMaxTrack] = {-10.,-10.};
+   double EOP[kMaxTrack] = {-10.,-10.};
+   double MUDEPTH[kMaxTrack] = {0.,0.};
+
+   double BEAME = -10.;
+   double TRKM = -10.;
+
+   double FE1 = -10.;
+   double FTheta1 = -10.;
+   double FPhi1 = -10.;
+
+   double FE2 = -10.;
+   double FTheta2 = -10.;
+   double FPhi2 = -10.;
+
+   double FE3 = -10.;
+   double FTheta3 = -10.;
+   double FPhi3 = -10.;
+
+   double PE1[kMaxTrack] = {-10.,-10.};
+   double PX1[kMaxTrack] = {-10.,-10.};
+   double PY1[kMaxTrack] = {-10.,-10.};
+   double PZ1[kMaxTrack] = {-10.,-10.};
+   double PE2[kMaxTrack] = {-10.,-10.};
+   double PX2[kMaxTrack] = {-10.,-10.};
+   double PY2[kMaxTrack] = {-10.,-10.};
+   double PZ2[kMaxTrack] = {-10.,-10.};
+   double PE3[kMaxTrack] = {-10.,-10.};
+   double PX3[kMaxTrack] = {-10.,-10.};
+   double PY3[kMaxTrack] = {-10.,-10.};
+   double PZ3[kMaxTrack] = {-10.,-10.};
+
+   double PPISIGMA[kMaxTrack] = {-1000.,-1000.};
+   double PMUSIGMA[kMaxTrack] = {-1000.,-1000.};
+   double PKSIGMA[kMaxTrack] = {-1000.,-1000.};
+
+   double PPILL[kMaxTrack] = {-1000.,-1000.};
+   double PMULL[kMaxTrack] = {-1000.,-1000.};
+   double PKLL[kMaxTrack] = {-1000.,-1000.};
+
+/*
+   double PIPE[kMaxTrack] = {-10.,-10.};
+   double PIPX[kMaxTrack] = {-10.,-10.};
+   double PIPY[kMaxTrack] = {-10.,-10.};
+   double PIPZ[kMaxTrack] = {-10.,-10.};
+   double MUPE[kMaxTrack] = {-10.,-10.};
+   double MUPX[kMaxTrack] = {-10.,-10.};
+   double MUPY[kMaxTrack] = {-10.,-10.};
+   double MUPZ[kMaxTrack] = {-10.,-10.};
+   double KPE[kMaxTrack] = {-10.,-10.};
+   double KPX[kMaxTrack] = {-10.,-10.};
+   double KPY[kMaxTrack] = {-10.,-10.};
+   double KPZ[kMaxTrack] = {-10.,-10.};
+*/
+   double FPE1[kMaxTrack] = {-10.,-10.};
+   double FPX1[kMaxTrack] = {-10.,-10.};
+   double FPY1[kMaxTrack] = {-10.,-10.};
+   double FPZ1[kMaxTrack] = {-10.,-10.};
+   double FPE2[kMaxTrack] = {-10.,-10.};
+   double FPX2[kMaxTrack] = {-10.,-10.};
+   double FPY2[kMaxTrack] = {-10.,-10.};
+   double FPZ2[kMaxTrack] = {-10.,-10.};
+   double FPE3[kMaxTrack] = {-10.,-10.};
+   double FPX3[kMaxTrack] = {-10.,-10.};
+   double FPY3[kMaxTrack] = {-10.,-10.};
+   double FPZ3[kMaxTrack] = {-10.,-10.};
+   double CHARGE[kMaxTrack] = {0.,0.};   
+
+   double L1TRIGGER1 = 0.;
+   double L1TRIGGER2 = 0.;
+   double L1TRIGGER3 = 0.;
+   double L1TRIGGER4 = 0.;
+   double L1TRIGGER5 = 0.;
+   double L1TRIGGER6 = 0.;
+   double L1TRIGGER7 = 0.;
+   double L1TRIGGER8 = 0.;
+   double L1TRIGGER9 = 0.;
+   double L1TRIGGER10 = 0.;
+   double L1TRIGGER11 = 0.;
+   double L1TRIGGER12 = 0.;
+   double L1TRIGGER13 = 0.;
+   double L1TRIGGER14 = 0.;
+   double L1TRIGGER15 = 0.;
+   double L1TRIGGER16 = 0.;
+
+   double L1BUCKET = 0.;
+   double CBBUCKET = 0.;
+   double CEBUCKET = 0.;
+   double TRBUCKET = 0.;
+   double LUBUCKET = 0.;
+
+   float tuple[kVarNum];
+
+
+
+// if we're in MC, check to see if the trigger fired
+   FAItem< DBEventHeader > eventHeader ;
+   extract( iFrame.record( Stream::kEvent ), eventHeader ) ;
+
+   double the_run = eventHeader->run();
+   double the_evt = eventHeader->number();
+
+//   if( eventHeader->monteCarlo() ) {
+      double L1Trigger = 0., L4Decision = 0.;
+ 
+////////////////////////////////////////////////////////////////////////////
+// Trigger L1
+////////////////////////////////////////////////////////////////////////////
+//   int l1Trigger = 0, l1Trigger_Sel = 0, l1Trigger_Hadron = 0;
+//   int l1Trigger_MuPair = 0, l1Trigger_ElTrack = 0, l1Trigger_RadTau = 0;
+//   int l1Trigger_TwoTrack = 0;
+ 
+      FAItem< TriggerData > trigData;
+      extract (iFrame.record(Stream::kEvent), trigData);
+
+      L1BUCKET = trigData->getL1AcceptBucket();
+      CBBUCKET = trigData->getCBTimeBucket();
+      CEBUCKET = trigData->getCETimeBucket();
+      TRBUCKET = trigData->getTrackingTimeBucket();
+      LUBUCKET = trigData->getLumiL1AcceptBucket();
+
+      FAItem< TriggerL1Data > trigDat;
+      extract (iFrame.record(Stream::kEvent), trigDat);
+
+
+ 
+// All possible trigger lines
+// --------------------------
+// DABoolean isHadron() const;  //Ax track > 2 & CB lo > 0
+// DABoolean isMuPair() const;  //Hi track > 1 & Back-to-back, 1 vs. 3/24
+// DABoolean isElTrack() const;  //Ax track > 0 & CB med > 0
+// DABoolean isRadTau() const;  //Stereo (hi + low) track > 1 & CB lo > 0
+// DABoolean isBarrelBhabha() const; //Back-to-back Hi CB clusters
+ 
+// DABoolean isCBSingleHi() const;  //CB hi > 0
+// DABoolean isCESingleHi() const;  //CE hi > 0
+// DABoolean isEndcapBhabha() const; //CE hi clusters in opposite ends
+// DABoolean isTwoTrack() const; //Ax track > 1
+// DABoolean isPulser() const;  //Pulser trigger
+// DABoolean isRandom() const;  //Random trigger
+// DABoolean isMinBias() const; //Tracking or CB Timing bit (Ax>0 || CB lo>1)
+ 
+      // Decode trigger line information //
+ 
+      // L1 Accept if any trigger line fires
+
+/* 
+      if(trigDat->isHadron()) L1Trigger = 1.;
+      if(trigDat->isRadTau()) L1Trigger = 2.;
+      if(trigDat->isElTrack()) L1Trigger = 3.;
+      if(trigDat->isBarrelBhabha()) L1Trigger = 4.;
+      if(trigDat->isEndcapBhabha()) L1Trigger = 5.;
+      if(trigDat->isMuPair()) L1Trigger = 6.;
+      if(trigDat->isCBSingleHi()) L1Trigger = 7.;
+      if(trigDat->isCESingleHi()) L1Trigger = 8.;
+      if(trigDat->isPulser()) L1Trigger = 9.;
+      if(trigDat->isRandom()) L1Trigger = 10.;
+      if(trigDat->isTwoTrack()) L1Trigger = 11.;
+      if(trigDat->isMinBias()) L1Trigger = 12.;
+      if(trigDat->isPhotonA()) L1Trigger = 13.;
+      if(trigDat->isPhotonB()) L1Trigger = 14.;
+      if(trigDat->isPhotonC()) L1Trigger = 15.;
+      if(trigDat->isPhotonD()) L1Trigger = 16.;
+*/
+
+      if(trigDat->isHadron()) {
+        L1Trigger = 1.;
+        L1TRIGGER1 = 1.;
+      }
+      if(trigDat->isRadTau()) {
+        L1Trigger = 2.;
+        L1TRIGGER2 = 1.;
+      }
+      if(trigDat->isElTrack()) {
+        L1Trigger = 3.;
+        L1TRIGGER3 = 1.;
+      }
+      if(trigDat->isBarrelBhabha()) {
+        L1Trigger = 4.;
+        L1TRIGGER4 = 1.;
+      }
+      if(trigDat->isEndcapBhabha()) {
+        L1Trigger = 5.;
+        L1TRIGGER5 = 1.;
+      }
+      if(trigDat->isMuPair()) {
+        L1Trigger = 6.;
+        L1TRIGGER6 = 1.;
+      }
+      if(trigDat->isCBSingleHi()) {
+        L1Trigger = 7.;
+        L1TRIGGER7 = 1.;
+      }
+      if(trigDat->isCESingleHi()) {
+        L1Trigger = 8.;
+        L1TRIGGER8 = 1.;
+      }
+      if(trigDat->isPulser()) {
+        L1Trigger = 9.;
+        L1TRIGGER9 = 1.;
+      }
+      if(trigDat->isRandom()) {
+        L1Trigger = 10.;
+        L1TRIGGER10 = 1.;
+      }
+      if(trigDat->isTwoTrack()) {
+        L1Trigger = 11.;
+        L1TRIGGER11 = 1.;
+      }
+      if(trigDat->isMinBias()) {
+        L1Trigger = 12.;
+        L1TRIGGER12 = 1.;
+      }
+      if(trigDat->isPhotonA()) {
+        L1Trigger = 13.;
+        L1TRIGGER13 = 1.;
+      }
+      if(trigDat->isPhotonB()) {
+        L1Trigger = 14.;
+        L1TRIGGER14 = 1.;
+      }
+      if(trigDat->isPhotonC()) {
+        L1Trigger = 15.;
+        L1TRIGGER15 = 1.;
+      }
+      if(trigDat->isPhotonD()) {
+        L1Trigger = 16.;
+        L1TRIGGER16 = 1.;
+      }
+
+
+ 
+      // L1 Accept if any non-prescaled trigger line fires
+//   if ( (trigDat->isHadron())       ||
+//	(trigDat->isMuPair())       ||
+//	(trigDat->isElTrack())      ||
+//	(trigDat->isRadTau())       ||
+//	(trigDat->isBarrelBhabha())  )
+//   { l1Trigger_Sel = 1; }
+ 
+ 
+////////////////////////////////////////////////////////////////////////////
+// Software Trigger (L3 & L4)
+////////////////////////////////////////////////////////////////////////////
+      FAItem<Level4Decision > decision;
+      extract(iFrame.record(Stream::kEvent), decision );
+
+      switch( decision->decision() )
+      {
+	 case Level4Decision::kKeepLevel3Garbage :
+	 {
+	    L4Decision = 1.;
+	    break;
+	 }
+	 case Level4Decision::kLevel3AutoAccept :
+	 {
+	    L4Decision = 2.;
+	    break;
+	 }
+	 case Level4Decision::kLevel4Keep :
+	 {
+	    L4Decision = 3.;
+	    break;
+	 }
+      }
+
+      if( (!L1Trigger) || (!L4Decision) )
+	 return ActionBase::kFailed;
+
+//   }
+
+
+
+
+
+
+
+   FATable< NavTrack > trackTable;
+   extract( iFrame.record( Stream::kEvent ) , trackTable, "GoodThings"  );
+
+   FATable< NavTrack >::const_iterator trackBegin = trackTable.begin();
+   FATable< NavTrack >::const_iterator trackEnd = trackTable.end();
+
+   if(trackTable.size()!=2)
+   //if (trackEnd != trackBegin+2)
+      return ActionBase::kFailed;
+
+   FAItem<TDKinematicFit> pi1 = (*trackBegin).pionFit();
+   FAItem<TDKinematicFit> pi2 = (*(trackBegin+1)).pionFit();
+   FAItem<TDKinematicFit> mu1 = (*trackBegin).muonFit();
+   FAItem<TDKinematicFit> mu2 = (*(trackBegin+1)).muonFit();
+   FAItem<TDKinematicFit> k1 = (*trackBegin).kaonFit();
+   FAItem<TDKinematicFit> k2 = (*(trackBegin+1)).kaonFit();
+
+   if(!pi1.valid() || !pi2.valid())
+      return ActionBase::kFailed;
+
+   CHARGE[0] = (*pi1).charge();
+   CHARGE[1] = (*pi2).charge();
+
+   if(CHARGE[0]!=-CHARGE[1])
+      return ActionBase::kFailed;
+
+
+   int unmatchedTracks = 0;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackBegin;
+         trackItr != trackEnd ;
+         ++trackItr )
+   {
+
+      FAItem<DedxInfo> the_dedx = (*trackItr).dedxInfo();
+      FAItem<NavRich> the_rich = (*trackItr).richInfo();
+      FAItem<TDKinematicFit> pionFit = (*trackItr).pionFit();
+      FAItem<TDKinematicFit> muonFit = (*trackItr).muonFit();
+      FAItem<TDKinematicFit> kaonFit = (*trackItr).kaonFit();
+
+      double cos_theta1 = pionFit->pz() / pionFit->pmag();
+      double cos_theta2 = muonFit->pz() / muonFit->pmag();
+      double cos_theta3 = kaonFit->pz() / kaonFit->pmag();
+
+      int j = unmatchedTracks++;
+
+      if(j<kMaxTrack){
+
+      if(trackItr->trackShowerMatch().valid())
+         ME[j] = trackItr->trackShowerMatch()->matchedEnergy();
+
+      EOP[j] = trackItr->elecId().eOverP();
+      MUDEPTH[j] = trackItr->muonId().depth();
+      if(EOP[j]>0.8)
+        return ActionBase::kFailed;
+
+      if( (pionFit.valid()) && (the_dedx.valid()) )  {
+
+      PE1[j]=pionFit->lorentzMomentum().e();
+      PX1[j]=pionFit->px();
+      PY1[j]=pionFit->py();
+      PZ1[j]=pionFit->pz();
+      PPISIGMA[j]=the_dedx->piSigma();
+
+      if ((the_rich.valid()) && (fabs(cos_theta1) < 0.8) && (the_rich->pionHypWasAnalyzed()))
+      PPILL[j]=the_rich->pionLogLikelihood();
+      }
+
+      if( (muonFit.valid()) && (the_dedx.valid()) )  {
+
+      PE2[j]=muonFit->lorentzMomentum().e();
+      PX2[j]=muonFit->px();
+      PY2[j]=muonFit->py();
+      PZ2[j]=muonFit->pz();
+      PMUSIGMA[j]=the_dedx->muSigma();
+
+      if ((the_rich.valid()) && (fabs(cos_theta2) < 0.8) && (the_rich->muonHypWasAnalyzed()))
+      PMULL[j]=the_rich->muonLogLikelihood();
+      }
+
+      if( (kaonFit.valid()) && (the_dedx.valid()) )  {
+
+      PE3[j]=kaonFit->lorentzMomentum().e();
+      PX3[j]=kaonFit->px();
+      PY3[j]=kaonFit->py();
+      PZ3[j]=kaonFit->pz();
+      PKSIGMA[j]=the_dedx->kSigma();
+
+      if ((the_rich.valid()) && (fabs(cos_theta3) < 0.8) && (the_rich->kaonHypWasAnalyzed()))
+      PKLL[j]=the_rich->kaonLogLikelihood();
+      }
+
+   }
+   }
+
+
+
+   FATable< NavShower > showerTable;
+   extract( iFrame.record( Stream::kEvent ) , showerTable, "GoodThings" );
+
+   if(showerTable.size()==0)
+      return ActionBase::kFailed;
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+   FATable< NavShower >::const_iterator showerEnd = showerTable.end();
+
+   FATable< NavShower >::const_iterator fastest_shower = showerBegin;
+
+   if(fastest_shower->attributes().x925() < 1)   
+      return ActionBase::kFailed;
+   if(fastest_shower->attributes().energy() < 0.5)   
+      return ActionBase::kFailed;
+
+
+   int unmatchedShowers = 0;
+
+   for ( FATable< NavShower >::const_iterator showerItr = showerBegin;
+         showerItr != showerEnd ;
+         ++showerItr )
+   {
+
+      int j = unmatchedShowers++;
+
+      if(j<kMaxShower){
+
+        E[j] = showerItr->attributes().energy();
+        Theta[j] = showerItr->attributes().theta();
+        Phi[j] = showerItr->attributes().phi();
+        E925[j] = showerItr->attributes().x925();
+      }
+   }
+
+   // do the pion fit
+   FitEvt pipi( "Pipi", FitEvt::k_P4VecCM );
+   pipi.newPhoton(*fastest_shower);
+   pipi.newTrack(*pi1);
+   pipi.newTrack(*pi2);
+   pipi.doTheFit();
+
+   if( (pipi.chisqVtx()>0) && (pipi.chisqFit()>0) ) {
+   // fit converged  -  save this event
+
+      const HepLorentzVector vgpi (pipi.kdFitVec()[0]->lorentzMomentum());
+      const HepLorentzVector v1pi (pipi.kdFitVec()[1]->lorentzMomentum());
+      const HepLorentzVector v2pi (pipi.kdFitVec()[2]->lorentzMomentum());
+
+
+      ChisqVpi = pipi.chisqVtx();
+      ChisqFpi = pipi.chisqFit();
+
+      FE1 = vgpi.e();
+      FTheta1 = vgpi.theta();
+      FPhi1 = vgpi.phi();
+
+      FPE1[0]=v1pi.e();
+      FPX1[0]=v1pi.px();
+      FPY1[0]=v1pi.py();
+      FPZ1[0]=v1pi.pz();
+
+      FPE1[1]=v2pi.e();
+      FPX1[1]=v2pi.px();
+      FPY1[1]=v2pi.py();
+      FPZ1[1]=v2pi.pz();
+   }
+
+   // do the muon fit
+   FitEvt mumu( "Mumu", FitEvt::k_P4VecCM );
+   mumu.newPhoton(*fastest_shower);
+   mumu.newTrack(*mu1);
+   mumu.newTrack(*mu2);
+   mumu.doTheFit();
+
+   if( (mumu.chisqVtx()>0) && (mumu.chisqFit()>0) ) {
+   // fit converged  -  save this event
+
+      const HepLorentzVector vgmu (mumu.kdFitVec()[0]->lorentzMomentum());
+      const HepLorentzVector v1mu (mumu.kdFitVec()[1]->lorentzMomentum());
+      const HepLorentzVector v2mu (mumu.kdFitVec()[2]->lorentzMomentum());
+
+
+      ChisqVmu = mumu.chisqVtx();
+      ChisqFmu = mumu.chisqFit();
+
+      FE2 = vgmu.e();
+      FTheta2 = vgmu.theta();
+      FPhi2 = vgmu.phi();
+
+      FPE2[0]=v1mu.e();
+      FPX2[0]=v1mu.px();
+      FPY2[0]=v1mu.py();
+      FPZ2[0]=v1mu.pz();
+
+      FPE2[1]=v2mu.e();
+      FPX2[1]=v2mu.px();
+      FPY2[1]=v2mu.py();
+      FPZ2[1]=v2mu.pz();
+   }
+
+   // do the kaon fit
+   FitEvt kk( "Kk", FitEvt::k_P4VecCM );
+   kk.newPhoton(*fastest_shower);
+   kk.newTrack(*k1);
+   kk.newTrack(*k2);
+   kk.doTheFit();
+
+   if( (kk.chisqVtx()>0) && (kk.chisqFit()>0) ) {
+   // fit converged  -  save this event
+
+      const HepLorentzVector vgk (kk.kdFitVec()[0]->lorentzMomentum());
+      const HepLorentzVector v1k (kk.kdFitVec()[1]->lorentzMomentum());
+      const HepLorentzVector v2k (kk.kdFitVec()[2]->lorentzMomentum());
+
+
+      ChisqVk = kk.chisqVtx();
+      ChisqFk = kk.chisqFit();
+
+      FE3 = vgk.e();
+      FTheta3 = vgk.theta();
+      FPhi3 = vgk.phi();
+
+      FPE3[0]=v1k.e();
+      FPX3[0]=v1k.px();
+      FPY3[0]=v1k.py();
+      FPZ3[0]=v1k.pz();
+
+      FPE3[1]=v2k.e();
+      FPX3[1]=v2k.px();
+      FPY3[1]=v2k.py();
+      FPZ3[1]=v2k.pz();
+   }
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+   BEAME = beam_energy->value();
+   double s = pow((2*BEAME),2);
+   double pppn = sqrt(pow((PX1[0]+PX1[1]),2)+pow((PY1[0]+PY1[1]),2)+pow((PZ1[0]+PZ1[1]),2));
+   double pp2 = pow(PX1[0],2)+pow(PY1[0],2)+pow(PZ1[0],2);
+   double pn2 = pow(PX1[1],2)+pow(PY1[1],2)+pow(PZ1[1],2);
+   double mm = (pow((pow((sqrt(s)-pppn),2)-pp2-pn2),2)-4*pp2*pn2)/(4*pow((sqrt(s)-pppn),2));
+//   if(PIPX[0]<1000 && PIPY[0]<1000 && PIPZ[0] < 1000 && PIPX[1]<1000 && PIPY[1]<1000 && PIPZ[1] < 1000)
+   TRKM = sqrt(mm);   
+
+
+
+   tuple[knshower] = unmatchedShowers;
+
+   tuple[chisqvpi] = ChisqVpi;
+   tuple[chisqfpi] = ChisqFpi;
+   tuple[chisqvmu] = ChisqVmu;
+   tuple[chisqfmu] = ChisqFmu;
+   tuple[chisqvk] = ChisqVk;
+   tuple[chisqfk] = ChisqFk;
+
+   tuple[e1] = E[0];
+   tuple[th1] = Theta[0];
+   tuple[phi1] = Phi[0];
+   tuple[e9251] = E925[0];
+
+   tuple[e2] = E[1];
+   tuple[th2] = Theta[1];
+   tuple[phi2] = Phi[1];
+   tuple[e9252] = E925[1];
+
+   tuple[e3] = E[2];
+   tuple[th3] = Theta[2];
+   tuple[phi3] = Phi[2];
+   tuple[e9253] = E925[2];
+
+   tuple[e4] = E[3];
+   tuple[th4] = Theta[3];
+   tuple[phi4] = Phi[3];
+   tuple[e9254] = E925[3];
+
+   tuple[e5] = E[4];
+   tuple[th5] = Theta[4];
+   tuple[phi5] = Phi[4];
+   tuple[e9255] = E925[4];
+
+   tuple[e6] = E[5];
+   tuple[th6] = Theta[5];
+   tuple[phi6] = Phi[5];
+   tuple[e9256] = E925[5];
+
+   tuple[e7] = E[6];
+   tuple[th7] = Theta[6];
+   tuple[phi7] = Phi[6];
+   tuple[e9257] = E925[6];
+
+   tuple[e8] = E[7];
+   tuple[th8] = Theta[7];
+   tuple[phi8] = Phi[7];
+   tuple[e9258] = E925[7];
+
+   tuple[e9] = E[8];
+   tuple[th9] = Theta[8];
+   tuple[phi9] = Phi[8];
+   tuple[e9259] = E925[8];
+
+   tuple[e10] = E[9];
+   tuple[th10] = Theta[9];
+   tuple[phi10] = Phi[9];
+   tuple[e92510] = E925[9];
+
+   tuple[fepi] = FE1;
+   tuple[fthpi] = FTheta1;
+   tuple[fphipi] = FPhi1;
+   tuple[femu] = FE2;
+   tuple[fthmu] = FTheta2;
+   tuple[fphimu] = FPhi2;
+   tuple[fek] = FE3;
+   tuple[fthk] = FTheta3;
+   tuple[fphik] = FPhi3;
+
+   tuple[l1trigger1] = L1TRIGGER1;
+   tuple[l1trigger2] = L1TRIGGER2;
+   tuple[l1trigger3] = L1TRIGGER3;
+   tuple[l1trigger4] = L1TRIGGER4;
+   tuple[l1trigger5] = L1TRIGGER5;
+   tuple[l1trigger6] = L1TRIGGER6;
+   tuple[l1trigger7] = L1TRIGGER7;
+   tuple[l1trigger8] = L1TRIGGER8;
+   tuple[l1trigger9] = L1TRIGGER9;
+   tuple[l1trigger10] = L1TRIGGER10;
+   tuple[l1trigger11] = L1TRIGGER11;
+   tuple[l1trigger12] = L1TRIGGER12;
+   tuple[l1trigger13] = L1TRIGGER13;
+   tuple[l1trigger14] = L1TRIGGER14;
+   tuple[l1trigger15] = L1TRIGGER15;
+   tuple[l1trigger16] = L1TRIGGER16;
+
+
+   tuple[l1bucket] = L1BUCKET;
+   tuple[cbbucket] = CBBUCKET;
+   tuple[cebucket] = CEBUCKET;
+   tuple[trbucket] = TRBUCKET;
+   tuple[lubucket] = LUBUCKET;
+
+
+  if(CHARGE[0]==1 && CHARGE[1]==-1){
+
+
+   tuple[me1] = ME[0];
+   tuple[eop1] = EOP[0];
+   tuple[me2] = ME[1];
+   tuple[eop2] = EOP[1];
+   tuple[mudepth1] = MUDEPTH[0];
+   tuple[mudepth2] = MUDEPTH[1];
+
+   tuple[pite1] = PE1[0];
+   tuple[pipx1] = PX1[0];
+   tuple[pipy1] = PY1[0];
+   tuple[pipz1] = PZ1[0];
+   tuple[mute1] = PE2[0];
+   tuple[mupx1] = PX2[0];
+   tuple[mupy1] = PY2[0];
+   tuple[mupz1] = PZ2[0];
+   tuple[kte1] = PE3[0];
+   tuple[kpx1] = PX3[0];
+   tuple[kpy1] = PY3[0];
+   tuple[kpz1] = PZ3[0];
+
+   tuple[pisigma1] = PPISIGMA[0];
+   tuple[musigma1] = PMUSIGMA[0];
+   tuple[ksigma1] = PKSIGMA[0];
+
+   tuple[pill1] = PPILL[0];
+   tuple[mull1] = PMULL[0];
+   tuple[kll1] = PKLL[0];
+
+   tuple[pite2] = PE1[1];
+   tuple[pipx2] = PX1[1];
+   tuple[pipy2] = PY1[1];
+   tuple[pipz2] = PZ1[1];
+   tuple[mute2] = PE2[1];
+   tuple[mupx2] = PX2[1];
+   tuple[mupy2] = PY2[1];
+   tuple[mupz2] = PZ2[1];
+   tuple[kte2] = PE3[1];
+   tuple[kpx2] = PX3[1];
+   tuple[kpy2] = PY3[1];
+   tuple[kpz2] = PZ3[1];
+
+   tuple[pisigma2] = PPISIGMA[1];
+   tuple[musigma2] = PMUSIGMA[1];
+   tuple[ksigma2] = PKSIGMA[1];
+
+   tuple[pill2] = PPILL[1];
+   tuple[mull2] = PMULL[1];
+   tuple[kll2] = PKLL[1];
+
+
+   tuple[fpite1] = FPE1[0];
+   tuple[fpipx1] = FPX1[0];
+   tuple[fpipy1] = FPY1[0];
+   tuple[fpipz1] = FPZ1[0];
+   tuple[fmute1] = FPE2[0];
+   tuple[fmupx1] = FPX2[0];
+   tuple[fmupy1] = FPY2[0];
+   tuple[fmupz1] = FPZ2[0];
+   tuple[fkte1] = FPE3[0];
+   tuple[fkpx1] = FPX3[0];
+   tuple[fkpy1] = FPY3[0];
+   tuple[fkpz1] = FPZ3[0];
+
+   tuple[fpite2] = FPE1[1];
+   tuple[fpipx2] = FPX1[1];
+   tuple[fpipy2] = FPY1[1];
+   tuple[fpipz2] = FPZ1[1];
+   tuple[fmute2] = FPE2[1];
+   tuple[fmupx2] = FPX2[1];
+   tuple[fmupy2] = FPY2[1];
+   tuple[fmupz2] = FPZ2[1];
+   tuple[fkte2] = FPE3[1];
+   tuple[fkpx2] = FPX3[1];
+   tuple[fkpy2] = FPY3[1];
+   tuple[fkpz2] = FPZ3[1];
+
+   tuple[charge1] = CHARGE[0];
+   tuple[charge2] = CHARGE[1];
+
+  }
+
+   else if(CHARGE[1]==1 && CHARGE[0]==-1){
+
+   tuple[me1] = ME[1];
+   tuple[eop1] = EOP[1];
+   tuple[me2] = ME[0];
+   tuple[eop2] = EOP[0];
+   tuple[mudepth1] = MUDEPTH[1];
+   tuple[mudepth2] = MUDEPTH[0];
+
+
+   tuple[pite1] = PE1[1];
+   tuple[pipx1] = PX1[1];
+   tuple[pipy1] = PY1[1];
+   tuple[pipz1] = PZ1[1];
+   tuple[mute1] = PE2[1];
+   tuple[mupx1] = PX2[1];
+   tuple[mupy1] = PY2[1];
+   tuple[mupz1] = PZ2[1];
+   tuple[kte1] = PE3[1];
+   tuple[kpx1] = PX3[1];
+   tuple[kpy1] = PY3[1];
+   tuple[kpz1] = PZ3[1];
+
+   tuple[pisigma1] = PPISIGMA[1];
+   tuple[musigma1] = PMUSIGMA[1];
+   tuple[ksigma1] = PKSIGMA[1];
+
+   tuple[pill1] = PPILL[1];
+   tuple[mull1] = PMULL[1];
+   tuple[kll1] = PKLL[1];
+
+   tuple[pite2] = PE1[0];
+   tuple[pipx2] = PX1[0];
+   tuple[pipy2] = PY1[0];
+   tuple[pipz2] = PZ1[0];
+   tuple[mute2] = PE2[0];
+   tuple[mupx2] = PX2[0];
+   tuple[mupy2] = PY2[0];
+   tuple[mupz2] = PZ2[0];
+   tuple[kte2] = PE3[0];
+   tuple[kpx2] = PX3[0];
+   tuple[kpy2] = PY3[0];
+   tuple[kpz2] = PZ3[0];
+
+   tuple[pisigma2] = PPISIGMA[0];
+   tuple[musigma2] = PMUSIGMA[0];
+   tuple[ksigma2] = PKSIGMA[0];
+
+   tuple[pill2] = PPILL[0];
+   tuple[mull2] = PMULL[0];
+   tuple[kll2] = PKLL[0];
+
+   tuple[fpite1] = FPE1[1];
+   tuple[fpipx1] = FPX1[1];
+   tuple[fpipy1] = FPY1[1];
+   tuple[fpipz1] = FPZ1[1];
+   tuple[fmute1] = FPE2[1];
+   tuple[fmupx1] = FPX2[1];
+   tuple[fmupy1] = FPY2[1];
+   tuple[fmupz1] = FPZ2[1];
+   tuple[fkte1] = FPE3[1];
+   tuple[fkpx1] = FPX3[1];
+   tuple[fkpy1] = FPY3[1];
+   tuple[fkpz1] = FPZ3[1];
+
+   tuple[fpite2] = FPE1[0];
+   tuple[fpipx2] = FPX1[0];
+   tuple[fpipy2] = FPY1[0];
+   tuple[fpipz2] = FPZ1[0];
+   tuple[fmute2] = FPE2[0];
+   tuple[fmupx2] = FPX2[0];
+   tuple[fmupy2] = FPY2[0];
+   tuple[fmupz2] = FPZ2[0];
+   tuple[fkte2] = FPE3[0];
+   tuple[fkpx2] = FPX3[0];
+   tuple[fkpy2] = FPY3[0];
+   tuple[fkpz2] = FPZ3[0];
+
+   tuple[charge1] = CHARGE[1];
+   tuple[charge2] = CHARGE[0];
+
+  }
+   tuple[beam_e] = BEAME;
+   tuple[m_trk] = TRKM;
+
+   (*m_showerTuple).fill(tuple);
+
+
+
+
+   return ActionBase::kPassed;
+}
+
+
+ActionBase::ActionResult
+TwoTracksISRProc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   FAItem< MagneticField > cleoBField;
+   extract( iFrame.record( Stream::kBeginRun ), cleoBField );
+
+   FitEvtSettings &settings(FitEvtSettings::instance());
+   settings.setField(*cleoBField);
+   settings.setBeamSpot(*spot);
+   settings.setLorVecCM( beam_energy->value() );
+
+
+   return ActionBase::kPassed;
+}
+
+
+/*
+ActionBase::ActionResult
+TwoTracksISRProc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

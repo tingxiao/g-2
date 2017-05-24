@@ -1,0 +1,346 @@
+
+Module : C3ccProd
+
+Date   : Mon Jul 19 11:32:57 1999
+User   : bkh
+Old Tag: none
+New Tag: v02_00_00
+Message: 
+First tag after name change
+Module : C3ccProd
+
+Date   : Mon Jul 19 17:31:13 1999
+User   : bkh
+Old Tag: v02_00_00
+New Tag: v02_01_00
+Message: 
+Better checks against bad raw data
+Module : C3ccProd
+
+Date   : Wed Jul 21 10:40:19 1999
+User   : bkh
+Old Tag: v02_01_00
+New Tag: v02_01_01
+Message: 
+Changed WARNING messages to ERROR
+Module : C3ccProd
+
+Date   : Fri Sep  3 16:30:36 1999
+User   : bkh
+Old Tag: v02_01_01
+New Tag: v02_01_02
+Message: 
+Initialize error matrix on dummy vertex with zeros
+Module : C3ccProd
+
+Date   : Tue Sep 14 13:45:04 1999
+User   : bkh
+Old Tag: v02_01_02
+New Tag: v02_02_00
+Message: 
+Install proxy for the "fetch-constants" object
+Module : C3ccProd
+
+Date   : Thu Sep 16 13:38:59 1999
+User   : bkh
+Old Tag: v02_02_00
+New Tag: v02_02_01
+Message: 
+Add CcGeom library to link list to resolve references
+Module : C3ccProd
+
+Date   : Wed Sep 22 12:20:18 1999
+User   : bkh
+Old Tag: v02_02_01
+New Tag: v02_02_02
+Message: 
+Fill in SHARMODNAME = $(JOB) so gmake works better
+Module : C3ccProd
+Date   : Sun Oct 10 10:31:38 1999
+User   : cdj
+Old Tag: v02_02_02
+New Tag: v02_02_03
+Message: removed BDLclient dirctory from include
+
+Module : C3ccProd
+Date   : Mon Nov 22 21:39:45 1999
+User   : bkh
+Old Tag: v02_02_03
+New Tag: v02_02_04
+Message: 
+Improved error message
+Module : C3ccProd
+Date   : Tue Nov 23 15:07:32 1999
+User   : bkh
+Old Tag: v02_02_04
+New Tag: v02_02_05
+Message: 
+Improved error messages
+Module : C3ccProd
+Date   : Wed Nov 24 16:26:15 1999
+User   : bkh
+Old Tag: v02_02_05
+New Tag: v02_02_06
+Message: 
+Ignore badly flagged channels
+Module : C3ccProd
+Date   : Mon Dec  6 13:04:45 1999
+User   : bkh
+Old Tag: v02_02_06
+New Tag: v02_03_00
+Message: 
+Change to return null ptr & error msg when an error; do not assert out
+Module : C3ccProd
+Date   : Fri Dec 17 10:30:11 1999
+User   : cdj
+Old Tag: v02_03_00
+New Tag: v02_03_01
+Message: now compiles with cxx 6.2
+
+Module : C3ccProd
+Date   : Fri Dec 31 17:31:26 1999
+User   : bkh
+Old Tag: v02_03_01
+New Tag: v02_04_00
+Message: 
+Eliminated use of obsolete valid()
+Only ignore channels that are noisy, not all "bad" ones
+Replace bad gains by nearest good one
+Module : C3ccProd
+Date   : Mon Jan 17 17:25:23 2000
+User   : bkh
+Old Tag: v02_04_00
+New Tag: v02_04_01
+Message: 
+Updated Makefile for StorageManagement
+Module : C3ccProd
+Date   : Mon Feb 14 17:48:07 2000
+User   : bkh
+Old Tag: v02_04_01
+New Tag: v02_04_02
+Message: 
+Alter handling of channel badness bits
+Module : C3ccProd
+Date   : Tue Feb 29 16:44:22 2000
+User   : bkh
+Old Tag: v02_04_02
+New Tag: v03_00_00
+Message: 
+Moved some proxies to C3ccReconProd
+Module : C3ccProd
+Date   : Fri Apr  7 14:03:53 2000
+User   : bkh
+Old Tag: v03_00_00
+New Tag: v03_00_01
+Message: 
+Moved constants-related proxies from C3ccReconProd
+Module : C3ccProd
+Date   : Mon Apr 17 16:01:20 2000
+User   : bkh
+Old Tag: v03_00_01
+New Tag: v03_00_02
+Message: 
+Elim checks of ptrs after new
+Module : C3ccProd
+Date   : Tue May 16 14:39:59 2000
+User   : bkh
+Old Tag: v03_00_02
+New Tag: v03_00_03
+Message: 
+Moved constants-related proxies to new producer
+Module : C3ccProd
+Date   : Wed Apr  4 13:25:30 2001
+User   : bkh
+Old Tag: v03_00_03
+New Tag: v03_00_04
+Message: 
+Make error matrix on origin 4x4 not 3x3
+Module : C3ccProd
+Date   : Thu May 17 15:50:49 2001
+User   : bkh
+Old Tag: v03_00_04
+New Tag: v03_00_05
+Message: 
+Add dummy data/mc flag to construction of shower attributes
+Module : C3ccProd
+Date   : Thu May 24 17:16:08 2001
+User   : bkh
+Old Tag: v03_00_05
+New Tag: v03_00_06
+Message: 
+Check if MC or not
+Module : C3ccProd
+Date   : Mon Jul 23 13:44:02 2001
+User   : bkh
+Old Tag: v03_00_06
+New Tag: v03_00_07
+Message: 
+Use CC run gains if they are available.
+Module : C3ccProd
+Date   : Tue Jul 24 12:42:10 2001
+User   : bkh
+Old Tag: v03_00_07
+New Tag: v03_00_08
+Message: 
+Extract DBEventHeader from the event where it resides
+Module : C3ccProd
+Date   : Wed Jul 25 17:54:06 2001
+User   : bkh
+Old Tag: v03_00_08
+New Tag: v03_00_09
+Message: 
+Get Beam Energy Correctly
+Module : C3ccProd
+Date   : Fri Aug 31 18:45:19 2001
+User   : bkh
+Old Tag: v03_00_09
+New Tag: v03_00_10
+Message: 
+Use BeamEnergy instead of CesrBeamEnergy
+Module : C3ccProd
+Date   : Sun Sep  2 16:23:10 2001
+User   : bkh
+Old Tag: v03_00_10
+New Tag: v03_00_11
+Message: 
+Suppress warning unti cc run corrections are ready
+Module : C3ccProd
+Date   : Fri Oct 26 17:58:08 2001
+User   : bkh
+Old Tag: v03_00_11
+New Tag: v03_00_12
+Message: 
+Get beam energy from right place for event summary
+Module : C3ccProd
+Date   : Thu Mar 21 14:30:16 2002
+User   : bkh
+Old Tag: v03_00_12
+New Tag: v03_00_13
+Message: 
+Accomodate changes in C3cc
+Module : C3ccProd
+Date   : Tue Mar 26 17:18:47 2002
+User   : bkh
+Old Tag: v03_00_13
+New Tag: v03_00_14
+Message: 
+Optimize by caching end() interator
+Module : C3ccProd
+Date   : Wed May  1 17:17:11 2002
+User   : bkh
+Old Tag: v03_00_14
+New Tag: v03_00_15
+Message: 
+Get hot list if present for shower object
+Module : C3ccProd
+Date   : Wed May  1 17:25:31 2002
+User   : bkh
+Old Tag: v03_00_15
+New Tag: v03_00_16
+Message: 
+Add one message per job if run gain or hot list is used
+Module : C3ccProd
+Date   : Thu Jun 13 15:58:06 2002
+User   : bkh
+Old Tag: v03_00_16
+New Tag: v03_00_17
+Message: 
+Structural code to have parameter control over 
+use of event vertex once it is ready.
+Module : C3ccProd
+Date   : Fri Jun 14 14:22:30 2002
+User   : cdj
+Old Tag: v03_00_17
+New Tag: v03_00_18
+Message: previous change now compiles under OSF1 (I don't know how it compiled under Solaris)
+
+Module : C3ccProd
+Date   : Wed Feb  5 14:05:31 2003
+User   : bkh
+Old Tag: v03_00_18
+New Tag: v03_00_19
+Message: 
+Cache Bfield object and send to CcQedEvent object
+Module : C3ccProd
+Date   : Wed Jul 30 16:45:56 2003
+User   : bkh
+Old Tag: v03_00_19
+New Tag: v03_00_20
+Message: Throw exception if no rungains or hotlist unless new parameter RequireRunGainsHotList is explicitly set to false
+
+Module : C3ccProd
+Date   : Fri Aug  1 17:22:44 2003
+User   : bkh
+Old Tag: v03_00_20
+New Tag: v03_00_21
+Message: Use EventVertex as shower origin if requested by parameter setting
+
+Module : C3ccProd
+Date   : Mon Sep 22 14:32:02 2003
+User   : cdj
+Old Tag: v03_00_21
+New Tag: v03_01_00
+Message: removed the need to bind to a beginrun change in CcShowerAttributesProxy (avoids a bad 'feature' in Suez that occurs when processing two MC files with the same run number back to back)
+
+Module : C3ccProd
+Date   : Tue Nov 30 16:15:42 2004
+User   : cdj
+Old Tag: v03_01_00
+New Tag: v04_00_00
+Message: use CcFortranShowerCorrector to implement new CcShowerAttributes interface
+
+Module : C3ccProd
+Date   : Fri Mar 16 11:02:32 2007
+User   : bkh
+Old Tag: v04_00_00
+New Tag: v04_00_01
+Message: Parameter-controlled increase in sigmas, smearing in MC
+
+Module : C3ccProd
+Date   : Sun Mar 18 09:42:25 2007
+User   : bkh
+Old Tag: v04_00_01
+New Tag: v04_00_02
+Message: Move fortran routines from C3cc
+
+Module : C3ccProd
+Date   : Mon Mar 19 12:37:15 2007
+User   : bkh
+Old Tag: v04_00_02
+New Tag: v04_00_03
+Message: Protect sqrt in ccgecs3 to be conservative
+
+Module : C3ccProd
+Date   : Tue Mar 20 08:33:26 2007
+User   : bkh
+Old Tag: v04_00_03
+New Tag: v04_00_04
+Message: Fix bug in ccgecs3
+
+Module : C3ccProd
+Date   : Tue Mar 20 09:35:32 2007
+User   : bkh
+Old Tag: v04_00_04
+New Tag: v04_00_05
+Message: strong typing for new variables in ccgecs3
+
+Module : C3ccProd
+Date   : Mon Jul  9 10:04:51 2007
+User   : bkh
+Old Tag: v04_00_05
+New Tag: v04_00_06
+Message: For solaris, fix random number interface in ccgecs3 for extra cc smearing
+
+Module : C3ccProd
+Date   : Mon Jan 14 12:06:27 2008
+User   : bkh
+Old Tag: v04_00_06
+New Tag: v04_00_07
+Message: Tag the CCFIX
+
+Module : C3ccProd
+Date   : Mon Feb 25 12:54:43 2008
+User   : bkh
+Old Tag: v04_00_07
+New Tag: v04_00_08
+Message: Tag code allowing separate flag-control of NEW endcap energy scale

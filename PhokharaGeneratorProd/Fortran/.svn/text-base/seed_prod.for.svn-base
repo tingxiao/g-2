@@ -1,0 +1,15 @@
+
+      program seed_prod
+
+      implicit none
+
+      integer s_seed(0:104)
+
+      call rlxdinit(1,32767)
+      call rlxdgetf(s_seed)
+      open(9,file='seed.dat',type='new')
+      write(9,*)s_seed
+      close(9)
+
+      stop
+      end

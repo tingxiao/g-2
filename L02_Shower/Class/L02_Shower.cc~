@@ -1,0 +1,311 @@
+// -*- C++ -*-
+//
+// Package:     L02_Shower
+// Module:      L02_Shower
+// 
+// Description: Lesson 2: Showers
+//
+// Implementation:
+//     use /cdat/daf9/jima/suez/tcl/L02_Shower.tcl
+//
+// Author:      James Alexander
+// Created:     Wed Jan  1 08:01:30 EST 2003
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "L02_Shower/L02_Shower.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+#include "HistogramInterface/HINtupleVarNames.h"
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+
+//I added the following at the suggestion of the NavShower web page
+#include "Navigation/NavConReg.h"
+#include "KinematicTrajectory/KTKinematicData.h"
+#include "Navigation/NavTkShMatch.h"
+#include "C3cc/CcAssignedEnergyHit.h"
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.L02_Shower" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.33 2002/12/18 01:45:06 cdj Exp $";
+static const char* const kTagString = "$Name: v06_08_00 $";
+
+//
+// static data member definitions
+//
+
+
+
+//
+// constructors and destructor
+//
+L02_Shower::L02_Shower( void )               // anal1
+   : Processor( "L02_Shower" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &L02_Shower::event,    Stream::kEvent );
+   //bind( &L02_Shower::beginRun, Stream::kBeginRun );
+   //bind( &L02_Shower::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+L02_Shower::~L02_Shower()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+L02_Shower::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+L02_Shower::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+enum {e1,th1,ph1,e9251,match1,good1,kVarNum};
+
+void
+L02_Shower::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+
+   m_allEnergy          = iHistoManager.histogram( "showerEnergy"       ,600, 0    ,  6.0 ) ;
+   m_allPhi             = iHistoManager.histogram( "showerPhi"          ,252,  0.0 ,  6.28 ) ;
+   m_allTheta           = iHistoManager.histogram( "showerTheta"        ,628,  0.0 , 3.1415962 ) ;
+   m_goodBTheta         = iHistoManager.histogram( "goodBTheta"         ,628,  0.0 , 3.1415962 ) ;
+   m_transitionTheta    = iHistoManager.histogram( "tansitionTheta"     ,628,  0.0 , 3.1415962 ) ;
+   m_goodECTheta        = iHistoManager.histogram( "goodECTheta"        ,628,  0.0 , 3.1415962 ) ;
+   m_innerECTheta       = iHistoManager.histogram( "innerECTheta"       ,628,  0.0 , 3.1415962 ) ;
+
+   m_allGBe9oe25        = iHistoManager.histogram( "allGBe9oe25"        ,100,  0.0 ,  1.0 ) ;
+   m_allGBe1oe9	        = iHistoManager.histogram( "allGBe1oe9"         ,100,  0.0 ,  1.0 ) ;
+   m_allGBmass          = iHistoManager.histogram( "allGBmass"          , 50,  0.0 ,  1.0 ) ;
+   m_allGBwidth	        = iHistoManager.histogram( "allGBwidth"         ,100,  0.0 ,  0.5) ;
+
+
+   m_matchedGBEnergy    = iHistoManager.histogram( "matchedGBEnergy"    ,250,  0.0 ,  2.5 ) ;
+   m_matchedGBthisEnergy= iHistoManager.histogram( "matchedGBthisEnergy",250,  0.0 ,  2.5 ) ;
+   m_matchedGBeOverP    = iHistoManager.histogram( "matchedGBeOverP"    ,100,  0.0 ,  1.0 ) ;
+   m_matchedGBthise9oe25= iHistoManager.histogram( "matchedGBthise9oe25",100,  0.0 ,  1.0 ) ;
+
+   m_unMatchedGBEnergy  = iHistoManager.histogram( "unmatchedEnergy"    ,250,  0.0 ,  2.5 ) ;
+
+
+   HINtupleVarNames ntupleNames(kVarNum);
+   ntupleNames.addVar(e1,          "e1");
+   ntupleNames.addVar(th1,        "th1");
+   ntupleNames.addVar(ph1,       "phi1");
+   ntupleNames.addVar(e9251,    "e9251");
+   ntupleNames.addVar(match1,  "match1");
+   ntupleNames.addVar(good1,    "good1");
+
+   m_Showertuple = iHistoManager.ntuple(10,"Showers", kVarNum, 10000, ntupleNames.names());
+
+ 
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+L02_Shower::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   FATable< NavShower > showerTable;
+   extract( iFrame.record( Stream::kEvent ) , showerTable );
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+   FATable< NavShower >::const_iterator showerEnd = showerTable.end();
+   for (FATable< NavShower >::const_iterator showerItr = showerBegin; 
+        showerItr != showerEnd ; ++showerItr )
+   {
+
+// Make various plots of simple shower quantities
+      const CcGeV  thisEnergy ( showerItr->attributes().energy() ) ;
+      const CcReal thise9oe25 ( showerItr->attributes().e9oe25() ) ;
+      const CcReal howManyXtals ( showerItr->attributes().nHitsUsed() );
+      bool goodness = ( showerItr->attributes().goodBarrel()   || 
+			showerItr->attributes().goodEndcap() ) &&
+	               !showerItr->attributes().hot() ;
+
+// fill ntuple here:
+      float tuple[kVarNum];
+      tuple[e1]=(float)thisEnergy;
+      tuple[th1]=showerItr->attributes().theta();
+      tuple[ph1]=showerItr->attributes().phi();
+      tuple[e9251]=(float)showerItr->attributes().e9oe25();
+      float match=0.0;
+      if (showerItr ->noTrackMatch()) {match=1.0;}
+      tuple[match1]=match;
+      float good=0.0;
+      if (goodness) {good=1.0;}
+      tuple[good1]=good;
+      (*m_Showertuple).fill(tuple);
+
+
+      (*m_allEnergy).fill( thisEnergy ) ;
+
+
+      if (    thisEnergy   < 0.800 
+	   && showerItr->noTrackMatch() 
+	   && howManyXtals > 5.0  
+	   && thise9oe25   > 0.8        
+	   && goodness
+	   && showerItr->attributes().theta() < 2.6 ) {
+	 (*m_allTheta).fill( showerItr->attributes().theta() ) ;
+	 (*m_allPhi).fill( showerItr->attributes().phi() ) ;
+      }
+
+
+
+      if ( showerItr->attributes().goodBarrel() ) 
+	 (*m_goodBTheta).fill( showerItr->attributes().theta() ) ;
+      if ( showerItr->attributes().transition() ) 
+	 (*m_transitionTheta).fill( showerItr->attributes().theta() ) ;
+      if ( showerItr->attributes().goodEndcap() ) 
+	 (*m_goodECTheta).fill( showerItr->attributes().theta() ) ;
+      if ( showerItr->attributes().innerEndcap() ) 
+	 (*m_innerECTheta).fill( showerItr->attributes().theta() ) ;
+
+
+// henceforth require all showers to be either goodBarrel or goodEndcap and not hot
+      if ( goodness )
+
+      {
+
+// go back to plotting some generic shower quantities
+      (*m_allGBe9oe25).fill( showerItr->attributes().e9oe25() ) ;
+      (*m_allGBe1oe9).fill( showerItr->attributes().e1oe9() ) ;
+      (*m_allGBmass).fill( showerItr->attributes().mass() ) ;
+      (*m_allGBwidth).fill( showerItr->attributes().width() ) ;
+      
+
+// Now examine the showers separately for matched and unmatched cases
+// First: the matched case:
+      if( !showerItr->noTrackMatch() ) 
+      {          
+	 //Loop over the matched tracks
+	 FATable< NavTkShMatch > matches ( showerItr->trackMatches() ) ;
+         for( FATable< NavTkShMatch >::const_iterator iM ( matches.begin() ) ;
+	       iM != matches.end() ; ++iM )
+          {             
+             // match energy
+	     (*m_matchedGBEnergy).fill( (*iM).matchedEnergy() ) ;
+	     (*m_matchedGBthisEnergy).fill( thisEnergy ) ;
+	     (*m_matchedGBeOverP).fill( (*iM).eOverP() ) ;
+	     (*m_matchedGBthise9oe25).fill( thise9oe25 ) ;
+	  }
+      } // end of matched case
+
+//Second:  the unmatched case:
+      else
+      {
+	 (*m_unMatchedGBEnergy).fill( thisEnergy ) ;
+
+      } // end of unmatched case
+
+
+      } // end of goodBarrel, goodEndcap if-block
+
+   } // end of loop of NavShowers
+
+   return ActionBase::kPassed;
+}
+
+/*
+ActionBase::ActionResult
+L02_Shower::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+/*
+ActionBase::ActionResult
+L02_Shower::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

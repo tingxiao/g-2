@@ -1,0 +1,270 @@
+// -*- C++ -*-
+//
+// Package:     <package>
+// Module:      BabayagaDecayTreeProxy
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      Brian K. Heltsley
+// Created:     Tue Jan 13 12:26:13 EST 2004
+// $Id: BabayagaDecayTreeProxy.cc,v 1.5 2006/06/05 13:22:37 gregor Exp $
+//
+// Revision history
+//
+// $Log: BabayagaDecayTreeProxy.cc,v $
+// Revision 1.5  2006/06/05 13:22:37  gregor
+// Eliminated compiler warnings:
+// removed unused variable 'time'.
+//
+// Revision 1.4  2004/03/17 21:15:40  bkh
+// Remove default mode to avoid typos giving Bhabhas; tag Surik's recent fixes
+//
+// Revision 1.3  2004/01/22 19:22:19  bkh
+// First tag
+//
+// Revision 1.2  2004/01/22 16:48:13  souren
+// Code still need to be tested, there is a problem with Mode 4 (pi-,pi+) , but MuPair, Bhabha and GamGam seem fine
+//
+// Revision 1.1.1.1  2004/01/13 23:24:13  bkh
+// imported BabayagaGeneratorProd sources
+//
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+#include <stdlib.h>   // for ::exit
+#include <assert.h>
+
+#include <memory>  //for auto_ptr
+
+// user include files
+#include "Experiment/report.h"
+#include "Experiment/fortran_types.h"
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"           
+#include "FrameAccess/FATable.h"
+
+#include "BabayagaGeneratorProd/BabayagaDecayTreeProxy.h"
+#include "ProxyBind/ProxyBoundMethodAction.h" //need for PROXY_BIND_METHOD
+#include "MCBeam/MCBeamParameters.h"
+#include "MCBeam/MCBeamParticles.h"
+#include "MCBeam/MCEventVertex.h"
+#include "HepEvtDTInterface/HepEvtDTInterface.h"
+
+// STL classes
+// You may have to uncomment some of these or other stl headers
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+#include <vector>
+//#include <set>
+#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "package.BabayagaDecayTreeProxy" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: BabayagaDecayTreeProxy.cc,v 1.5 2006/06/05 13:22:37 gregor Exp $";
+static const char* const kTagString = "$Name: v01_00_04 $";
+
+//
+// static data member definitions
+//
+
+//
+// constructors and destructor
+//
+BabayagaDecayTreeProxy::BabayagaDecayTreeProxy( const BabayagaGeneratorProd* aProd )
+   : m_BabayagaDecayTree( 0 ) ,
+     m_producer         ( aProd )
+{
+   //bind 'auxilliary' functions that you want called when a
+   // new Record on the particular Stream appears
+   //bind( &BabayagaDecayTreeProxy::boundMethod, Stream::kBeginRun );
+}
+
+// BabayagaDecayTreeProxy::BabayagaDecayTreeProxy( const BabayagaDecayTreeProxy& iproxy )
+// {
+//   *this = iproxy;
+// }
+
+BabayagaDecayTreeProxy::~BabayagaDecayTreeProxy()
+{
+   delete m_BabayagaDecayTree ;
+}
+
+//
+// assignment operators
+//
+// const BabayagaDecayTreeProxy& BabayagaDecayTreeProxy::operator=( const BabayagaDecayTreeProxy& iproxy )
+// {
+//   if( this != &iproxy ) {
+//      // do actual copying here, plus:
+//      // "SuperClass"::operator=( iproxy );
+//   }
+//
+//   return *this;
+// }
+
+//
+// member functions
+//
+void
+BabayagaDecayTreeProxy::invalidateCache()
+{
+   delete m_BabayagaDecayTree ;
+   m_BabayagaDecayTree = 0 ;
+}
+
+extern "C"
+void
+bby_event_( const FDouble& eBeam  ) ;
+
+extern "C"
+void
+bby_to_hepevt_() ;
+
+extern "C"
+void      
+bby_init_(  const FInteger&   ich , 
+	    const FDouble&    eBeam,
+	    const FDouble&    angleMin,
+	    const FDouble&    angleMax,
+	    const FDouble&    energyMin,
+	    const FDouble&    acollMax );
+
+
+
+const BabayagaDecayTreeProxy::value_type*
+BabayagaDecayTreeProxy::faultHandler( const Record& iRecord,
+				      const DataKey& iKey )
+{
+   static DABoolean first (true) ;
+   if( first )
+   {
+      first = false ;
+
+      FAItem<MCBeamParameters>                               beamParms ;
+      extract( iRecord.frame().record( Stream::kStartRun ) , beamParms ) ;
+      const FDouble ebeam ( beamParms->electronBeamEnergy() ) ;
+
+      const string mode ( m_producer->getMode() ) ;
+      report( DEBUG, kFacilityString) << "Mode  = " << mode.c_str() << endl;
+
+      const FInteger ich ( mode == "Bhabha" ? 1 :
+			   ( mode == "MuPair" ? 2 :
+			     ( mode == "GamGam" ? 3 :
+			       ( mode == "PiPair" ? 4 : 0 ) ) ) ) ;
+
+      if( 0 == ich )
+      {
+	 report( ERROR, kFacilityString ) << "No Mode selected, exiting..." << endl ;
+	 assert( false ) ;
+      }
+      
+      const FDouble angleMin( m_producer->getMinimumAngle() );
+      const FDouble angleMax( m_producer->getMaximumAngle() );
+      const FDouble energyMin( m_producer->getMinimumEnergy() );
+      const FDouble acollinarityMax( m_producer->getMaximumAcollinarity() );
+      /* set parameters */
+      bby_init_( ich , ebeam, angleMin, angleMax, energyMin, acollinarityMax );
+   }
+
+   // be assertive: there should be no cached data at this point, else
+   // it's a programming error
+   assert( 0 == m_BabayagaDecayTree );
+
+   // get the particle properties
+   FAItem<MCParticlePropertyStore>                    properties;
+   extract( iRecord.frame().record(Stream::kPhysics), properties, "UserMCParticleProperties" );
+
+   FAItem<MCBeamParticles> beamParticles   ;
+   extract( iRecord,       beamParticles ) ;
+
+   FAItem<MCEventVertex>   eventVertex     ;
+   extract( iRecord,       eventVertex   ) ;
+
+   const HepPoint3D&         point        ( *eventVertex ) ; 
+   const HepLorentzVector&   lorMom       ( beamParticles->totalMomentum() ) ;
+   const HepLorentzRotation& boostCMToLab ( beamParticles->boostFromCMToLab() ) ;
+   const HepLorentzRotation& boostLabToCM ( beamParticles->boostFromLabToCM() ) ;
+
+   static const Integer kVirtualPhotonQQId ( 0 ) ;
+   const MCParticleProperty& vPhotonProperty ( properties->getUsingQQId( kVirtualPhotonQQId ) ) ;
+   
+   MCParticle* vPhoton = new MCParticle( vPhotonProperty, lorMom, point );
+
+   const HepLorentzVector cmLor ( boostLabToCM*lorMom ) ;
+   
+   const FDouble event_ebeam ( cmLor.e()/2. ) ;
+   bby_event_( event_ebeam ) ;
+
+
+   MCDecayTree* myTree ( new MCDecayTree( vPhoton, true ) )   ;
+   auto_ptr<MCDecayTree> p_BabayagaDecayTree ( myTree ) ;
+
+   HepEvtDTInterface* hepevt = HepEvtDTInterface::instance( "Babayaga" );
+   hepevt->resetCommons( eventVertex->t() );
+   hepevt->setMCDecayTree( myTree ) ;
+
+   bby_to_hepevt_() ;
+   hepevt->attachHepEvtToParticle(vPhoton ) ; // convert from commons to tree
+   
+// now boost back to lab
+   MCVertex* vtx ( &*vPhoton->vBegin() ) ;
+   for( MCVertex::pIterator pIt ( vtx->pBegin() ) ; pIt != vtx->pEnd() ; ++pIt )
+   {
+      MCParticle& par ( *pIt ) ;
+      par.setPosition( point ) ;
+// surik change particles directions now, 
+// babyaga is using "+z" direction for electron.
+      HepLorentzVector momFlip(0.,0.,0.,0.); 
+      momFlip.setX(-par.lorentzMomentum().px());
+      momFlip.setY(-par.lorentzMomentum().py());
+      momFlip.setZ(-par.lorentzMomentum().pz());
+      momFlip.setT( par.lorentzMomentum().e());
+     
+      par.setMomentum( HepVector3D( 
+	 Hep3Vector(boostCMToLab*momFlip) ) ) ;
+   }
+
+   report( DEBUG, kFacilityString) << *myTree <<endl;
+
+   return ( m_BabayagaDecayTree = p_BabayagaDecayTree.release() ) ;
+}
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//
+
+//
+// 'bound' functions
+//
+
+//void
+//BabayagaDecayTreeProxy::boundMethod( const Record& iRecord )
+//{
+//   report( INFO, kFacilityString) <<"BoundMethod: " <<iRecord.stream().value() << endl;
+//}
+
+//-----------------------------------------------
+// DO NOT DELETE
+#include "ProxyBind/Template/ProxyBindableTemplate.cc"
+template class ProxyBindableTemplate< MCDecayTree >;
+
+PROXY_BIND_METHOD( BabayagaDecayTreeProxy )
+//-----------------------------------------------
+

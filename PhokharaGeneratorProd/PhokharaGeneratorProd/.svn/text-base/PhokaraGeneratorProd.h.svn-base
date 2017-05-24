@@ -1,0 +1,120 @@
+// -*- C++ -*-
+#if !defined(BABAYAGAGENERATORPROD_BABAYAGAGENERATORPROD_H)
+#define BABAYAGAGENERATORPROD_BABAYAGAGENERATORPROD_H
+//
+// Package:     <BabayagaGeneratorProd>
+// Module:      BabayagaGeneratorProd
+//
+/**\class BabayagaGeneratorProd BabayagaGeneratorProd.h BabayagaGeneratorProd/BabayagaGeneratorProd.h
+ 
+ Description: <one line class summary>
+
+ Usage:
+    <usage>
+
+*/
+//
+// Author:      Brian K. Heltsley
+// Created:     Tue Jan 13 12:19:00 EST 2004
+// $Id: BabayagaGeneratorProd.h,v 1.3 2004/01/22 19:22:17 bkh Exp $
+//
+// Revision history
+//
+// $Log: BabayagaGeneratorProd.h,v $
+// Revision 1.3  2004/01/22 19:22:17  bkh
+// First tag
+//
+// Revision 1.2  2004/01/22 16:48:09  souren
+// Code still need to be tested, there is a problem with Mode 4 (pi-,pi+) , but MuPair, Bhabha and GamGam seem fine
+//
+// Revision 1.1.1.1  2004/01/13 23:24:12  bkh
+// imported BabayagaGeneratorProd sources
+//
+//
+
+// system include files
+
+// user include files
+#include "Processor/Producer.h"
+#include "HistogramInterface/HistogramPackage.h"
+#include "CommandPattern/Menu.h"
+#include "CommandPattern/Parameter.h"
+//#include "CommandPattern/Menu.h"
+
+// forward declarations
+
+class BabayagaGeneratorProd : public Producer
+{
+      // ------------ friend classses and functions ---------------
+
+   public:
+      // ------------ constants, enums and typedefs ---------------
+
+      // ------------ Constructors and destructor -----------------
+      BabayagaGeneratorProd( void );                      // anal1 
+      virtual ~BabayagaGeneratorProd();                   // anal5 
+
+      // ------------ member functions ----------------------------
+
+      // methods for beginning/end "Interactive"
+      virtual void init( void );             // anal1 "Interactive"
+      virtual void terminate( void );        // anal5 "Interactive"
+
+      // standard place for booking histograms
+      virtual void hist_book( HIHistoManager& );                  
+
+      // ------------ const member functions ----------------------
+
+//    generator mode
+      const string& getMode() const 
+      { return m_mode.value() ; } 
+//    minimum angle
+      const double& getMinimumAngle() const 
+      { return m_minimumAngle.value() ; }
+//    maximum angle
+      const double& getMaximumAngle() const 
+      { return m_maximumAngle.value() ; }
+//    minimum energy of outgoing particle
+      const double& getMinimumEnergy() const
+      { return m_minimumEnergy.value() ; }
+//    maximum acollinarity
+      const double& getMaximumAcollinarity() const
+      { return m_maximumAcollinarity.value() ; }
+
+
+      // ------------ static member functions ---------------------
+
+   protected:
+      // ------------ protected member functions ------------------
+
+      // ------------ protected const member functions ------------
+
+   private:
+      // ------------ Constructors and destructor -----------------
+      BabayagaGeneratorProd( const BabayagaGeneratorProd& );
+
+      // ------------ assignment operator(s) ----------------------
+      const BabayagaGeneratorProd& operator=( const BabayagaGeneratorProd& );
+
+      // ------------ private member functions --------------------
+
+      ProxyBase* makeMyProxy() ;
+
+      // ------------ private const member functions --------------
+
+      // ------------ data members --------------------------------
+
+      Menu              m_Menu;
+      Parameter<string> m_mode ;  /* Bhabha, MuPair, GamGam, PiPair */      
+      Parameter<double> m_minimumAngle;           // degree
+      Parameter<double> m_maximumAngle;           // degree
+      Parameter<double> m_minimumEnergy;          // GeV
+      Parameter<double> m_maximumAcollinarity;    // degree
+
+      // ------------ static data members -------------------------
+
+};
+
+// inline function definitions
+
+#endif /* BABAYAGAGENERATORPROD_BABAYAGAGENERATORPROD_H */

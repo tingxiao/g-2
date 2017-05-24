@@ -1,0 +1,636 @@
+\documentclass[12pt]{article}
+\usepackage{times}
+%%% page setup %%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\setlength{\topmargin}{-1.5 cm} 
+\setlength{\evensidemargin}{.0 cm} 
+\setlength{\oddsidemargin}{-.5 cm} 
+\setlength{\textheight}{24cm} 
+\setlength{\textwidth}{17.5cm} 
+\parskip = 2ex
+
+\begin{document}
+
+\begin{center}
+{\bf \Large PHOKHARA version 6.0}
+
+December 2006
+\end{center}
+
+\abstract{
+Electron--positron annihilation into hadrons is one of the basic
+reactions of particle physics. The radiative 
+return~\cite{Zerwas,Binner:1999bt} 
+offers the unique possibility for a measurement of this quantity over 
+a wide range of energies.
+The large luminosity of present $\phi$- and $B$-factories easily 
+compensates for the additional factor of $\alpha$ due to the 
+emission of a hard photon.
+PHOKHARA is a Monte Carlo event generator which simulates this process
+at next-to-leading order (NLO) accuracy. 
+Versions~1.0 and~2.0 were based on a NLO
+treatment of the corrections from initial-state radiation (ISR). 
+Those are independent of the final-state channel. 
+Version~3.0 incorporates NLO corrections to final-state radiation (FSR) 
+for pion pair production. Version 4.0 of PHOKHARA  
+includes nucleon pair production  and NLO corrections 
+to FSR for muon pairs.
+PHOKHARA version 5.0
+included $\pi^+\pi^-\pi^0$ and kaon pair ($K^+K^-$ and $K^0\bar K^0$)
+production as new channels, and radiative $\phi$ decay contributions 
+to the reaction $e^+e^-\to\pi^+\pi^-\gamma$. Version 
+5.1 of PHOKHARA introduces minor improvements with respect to 
+the version 5.0.
+In the newest version 6.0 the reaction
+ $e^+e^-\to \Lambda (\to \pi^- p) \bar \Lambda (\to \pi^+ \bar p)\gamma$
+ (in LO approximation) was
+added. The $\Lambda$- and $\bar\Lambda$-spin dependence and the
+correlation among their decay products is included \cite{Czyz:2007wi} .
+}
+
+
+\section{Introduction}
+
+The first version of the Monte Carlo event generator 
+(PHOKHARA version 1.0~\cite{Rodrigo:2001kf})
+incorporates ISR only at NLO~\cite{Rodrigo:2001jr}, 
+with $\pi^+\pi^-\gamma(\gamma)$ and 
+$\mu^+\mu^-\gamma(\gamma)$ as final states, and was designed to 
+simulate configurations with photons emitted at relatively large 
+angles, $\theta^2 \gg m_e^2/s$. 
+Its second version (PHOKHARA version 2.0~\cite{Czyz:2002np}) 
+extends the validity of the program into the small angle 
+region~\cite{Kuhn:2002xg,Rodrigo:2001cc}, 
+incorporates FSR at leading order (LO) for $\pi^+ \pi^-$ and 
+$\mu^+ \mu^-$ final states, and includes four-pion final states 
+(without FSR) in the formulation described in detail in~\cite{Czyz:2000wh}.
+
+The third version of the generator (PHOKHARA version 3.0~\cite{Czyz:2003np}),
+allows simultaneous emission of one photon from the initial state 
+and one photon from the final state, requiring only one of them to 
+be hard. This includes in particular the radiative return
+to $\pi^+ \pi^- (\gamma)$ and thus the measurement of the (one-photon) 
+inclusive $\pi^+ \pi^-$ cross section. 
+The influence of collinear lepton pair radiation has
+been investigated in \cite{Ustron_03_N,Ustron_05_N}.
+
+Recent experimental results indeed demonstrate the power
+of the method and  indicate that a precision of one per cent
+or better is within reach.
+In view of this progress a further improvement of our theoretical 
+understanding seems to be required. 
+To meet that requirements
+PHOKHARA version 4.0~\cite{Nowak,Czyz:PH04}),
+introduced production of nucleon pairs (proton-antiproton and 
+neutron-antineutron) as new channels, and FSR for muon pair 
+production at NLO. Some improvements were also incorporated 
+to better describe FSR at NLO for pion pair production. The 
+effect of photon vacuum polarization was also implemented.
+
+PHOKHARA version 5.0 (and 5.1) was a continuation of that
+effort. New hadronic channels were
+introduced, mainly $\pi^+\pi^-\pi^0$ 
+and kaon pairs ($K^+K^-$ and $K^0\bar K^0$) \cite{Czyz:2005as}, and
+in addition the radiative $\phi$ decay contributions 
+to the reaction $e^+e^-\to\pi^+\pi^-\gamma$ was incorporated
+\cite{Czyz:2004nq} to improve
+description of that process when running at $\phi$-factory (DAPHNE)
+energy. The old parameterization of 
+the pion form factor \cite{Kuhn:1990ad} was changed to one based
+on a dual resonance model \cite{Khodj04}. The new form factor
+is supposed to describe data up to $Q^2\sim$ 10 GeV$^2$
+(although very recent experimental results \cite{Pedlar:2005sj}
+seem to indicate that the rate
+is still underestimated for large $Q^2$). 
+The vacuum polarization was taken from \cite{Jeg_web}, however
+the contributions from narrow resonances
+($\phi,J/\psi$ etc.), which should be parameterised
+separately, were taken out from
+the original code. Linear interpolation of the 'continuum'
+contribution is used instead in the region of narrow resonances,
+which were reintroduced as additional separate contributions
+(only $\phi$ for muon and pion pair production 
+in the present version). Many additional
+aspects of the radiative return and PHOKHARA Monte Carlo event generator
+was discussed in \cite{proc}. Version PHOKHARA 5.1 introduces 
+some improvements with respect to version 5.0 (details of the models of the
+ radiative $\phi$ decays were changed).
+In the newest version 6.0 the reaction 
+$e^+e^-\to \Lambda (\to \pi^- p) \bar \Lambda (\to \pi^+ \bar p)\gamma$ 
+(in LO approximation) was
+added. The $\Lambda$- and $\bar\Lambda$-spin dependence and the
+correlation among their decay products is included \cite{Czyz:2007wi}.
+
+
+\section{The program}
+
+PHOKHARA is written is FORTRAN 77. 
+Real variables and functions are defined  {\tt real*8}. 
+Complex numbers and functions are defined {\tt complex*16}. 
+The present distribution consist of the following files:
+\begin{itemize}
+\item{{\bf phokhara\_6.0.f} : the main program.}
+
+\item{{\bf phokhara\_6.0.inc} : defines some variables and {\tt COMMON} 
+blocks which are used by most of the subroutines in the main program.}
+
+\item{{\bf input\_6.0.dat} : all the constants and specific parameters 
+needed for the generation are given through this file.
+The values of these input parameters can be varied by the user.}
+
+\item{{\bf  const$\underline{\,\,}$and$\underline{\,\,}$model$\underline{\,\,}$param.dat} : all the constants and specific parameters 
+needed for the modelling of the hadronic currents are given in this file.
+The values of these input parameters can be varied by the user in case
+ he uses his own version(s) of the hadronic current(s).}
+
+\item{{\bf vac\_pol\_hc1.f} : vacuum polarization from Ref.~\cite{Jeg_web}}
+  changed as described in the Introduction
+
+\item{{\bf common.f} : file containing {\tt COMMON} blocks used by 
+ vac\_pol\_hc1.f }
+
+\item{{\bf seed.dat} : contains the seed used to initialize {\tt RANLUX},
+the double precision random number generator \cite{RANLUX}.
+ After each generation run a new seed is stored in this file.}
+
+\item{{\bf ranlxd.c } :  double precision {\tt RANLUX} 
+ code (in C)\cite{RANLUX}}
+
+\item{{\bf ranlxd.h, ranlux\_fort.c } :  interface FORTRAN--C for RANLUX }
+
+\item{{\bf testlxf.for} : test program for RANLUX}
+
+ \item{{\bf seed\_prod.for } : seed 'production' for running RANLUX }
+
+ \item{{\bf guide.ps, notes.ps } : description of RANLUX}
+
+ \item{{\bf README } : short description how to compile
+ and link PHOKHARA and test RANLUX}
+
+ \item{{\bf Makefile } : for compiling and linking PHOKHARA}
+
+\end{itemize}
+
+\noindent
+Further information and updates of the program can be find in the 
+following web address: \\ {\tt http://ific.uv.es/$\sim$rodrigo/phokhara}
+
+\section{Input file}
+
+The interaction of the user with the program is made through the 
+file {\bf input\_6.0.dat}. It defines some physical constants and the 
+specific parameters needed for the generation.
+The values of these parameters can be changed by the user.
+Some new variables have been included.
+
+\begin{itemize}
+\item[]{{\tt nges} -- number of events which shall be generated. The number 
+of events accepted and returned in the output file depends on the 
+kinematical constraints, the energy of the collision and the 
+generated final state. Typically, the acceptance rate varies 
+between $30\%$ and a few per cent.}
+
+\item[]{{\tt nm} -- number of events used to scan the integrand and find 
+its maximum. A preliminary scan is maid to find the maximum(s) of the 
+integrand(s) before the true generation starts. 
+The value of the maximum used in the generation phase is slightly 
+greater than this approximated maximum.}
+
+\item[]{{\tt outfile} -- name of the output file where the four-momenta 
+of the particles of the accepted events are stored.}
+
+\item[]{{\tt iprint} -- whether the four-momenta of the generated events
+is printed ({\tt iprint=1}) or not ({\tt iprint=0}) through 
+subroutine {\tt writeevent} in the output file {\tt outfile}.}
+
+\item[]{{\tt nlo} -- whether the program should provide predictions at 
+LO ({\tt nlo=0}) or NLO ({\tt nlo=1}).}
+
+\item[]{{\tt w} -- energy cutoff of soft photon emission, normalized 
+to the centre-of-mass energy. The physical result is independent of its
+value. Recommended value $w=10^{-4}$.}
+
+\item[]{{\tt pion} -- which final state channel shall be simulated: 
+\begin{itemize}
+\item[]{{\tt pion=0} : $\mu^+\mu^-$}
+\item[]{{\tt pion=1} : $\pi^+\pi^-$} 
+\item[]{{\tt pion=2} : $2\pi^0\pi^+\pi^-$}
+\item[]{{\tt pion=3} : $2\pi^+2\pi^-$}
+\item[]{{\tt pion=4} : $p\bar{p}$}
+\item[]{{\tt pion=5} : $n\bar{n}$}
+\item[]{{\tt pion=6} : $K^+K^-$}
+\item[]{{\tt pion=7} : $K^0\bar K^0$}
+\item[]{{\tt pion=8} : $\pi^+\pi^-\pi^0$}
+\item[]{{\tt pion=9} : $\Lambda (\to \pi^- p) \bar \Lambda (\to \pi^+ \bar p)$}
+\end{itemize}}
+
+\item[]{{\tt fsr} -- only ISR is simulated ({\tt fsr=0}),
+FSR is included at LO without ISR--FSR interference ({\tt fsr=1})
+or with ISR--FSR interference ({\tt fsr=2}).
+The ISR--FSR interference is included only when the program is 
+running in LO mode.}
+
+\item[]{{\tt fsrnlo} -- includes ({\tt fsrnlo=1}) or not 
+({\tt fsrnlo=0}) simultaneous emission of one photon from the initial 
+state and one photon from the final state, and the corresponding 
+virtual corrections. Only in the two-pions, two charged kaons
+ and two-muons modes.}
+
+\item[]{{\tt ivac} -- vacuum polarization on ({\tt ivac=1}) or 
+off ({\tt ivac=0}).}
+
+\item[]{{\tt tagged} -- at least one photon is tagged ({\tt tagged=0}) 
+inside the angular region defined by the angular cuts {\tt phot1cut} 
+and {\tt phot2cut}. In the untagged mode ({\tt tagged=1}), the 
+hadrons are tagged and the angular and energy cuts are applied on the
+missing energy-momentum.}
+
+\item[]{{\tt FF\_Pion} -- choice between Breit-Wigner parameterisation
+ of the pion form factor:
+   K\"uhn-Santmaria parameterisation ({\tt FF\_Pion=0}) or
+ Gounaris-Sakurai parameterisation ({\tt FF\_Pion=1}) 
+ }
+\item[]{{\tt f0\_model} -- three different models for radiative $\phi$-decays:
+  KK model \cite{Czyz:2004nq} ({\tt f0\_model=0}),
+  no structure \cite{Czyz:2004nq} ({\tt f0\_model=1}),
+  radiative $\phi$-decays not included ({\tt f0\_model=2}),
+  Cesare Bini (KLOE) - private communication ({\tt f0\_model=3}).
+}
+
+\end{itemize}
+
+
+
+The remaining set of parameters defines the specific experimental settings:
+\begin{itemize}
+\item[]{{\tt E} -- centre-of-mass energy (GeV).}
+
+\item[]{{\tt q2min} -- minimal squared invariant mass of the system formed 
+by the hadrons and the tagged photon (GeV$^2$).}
+
+\item[]{{\tt q2\_min\_c} -- minimal squared invariant mass of the 
+hadronic/muonic system (GeV$^2$).}
+
+\item[]{{\tt q2\_max\_c} -- maximal squared invariant mass of the 
+hadronic/muonic system (GeV$^2$).}
+
+\item[]{{\tt gmin} -- minimal energy of the tagged photon (GeV).}
+
+\item[]{{\tt phot1cut} -- lower cut on the azimuthal angle of the tagged photon
+(degrees).}
+
+\item[]{{\tt phot2cut} -- upper cut on the azimuthal angle of the tagged photon
+(degrees).}
+
+\item[]{{\tt pi1cut} -- lower cut on the azimuthal angle of the muons 
+or hadrons 
+(degrees).}
+
+\item[]{{\tt pi2cut} -- upper cut on the azimuthal angle of the muons 
+or hadrons 
+(degrees).}
+\end{itemize}
+All the kinematical cuts are given in the centre-of-mass system of 
+the initial particles. The azimuthal angles are 
+defined with respect to the positron momentum.
+
+The program offers the possibility of presenting various differential 
+distributions as histograms.
+If this option is used, the name of the output file where the histograms 
+are stored and the attributes of each histogram must be given.
+\begin{itemize}
+\item[]{{\tt title(i)} -- title of histogram {\tt i}}
+\item[]{{\tt xlow(i)} -- lower edge in x for histogram {\tt i}}
+\item[]{{\tt xup(i)} -- upper edge in x for histogram {\tt i}}
+\item[]{{\tt bins(i)} -- number of bins for histogram {\tt i}}
+\end{itemize}
+where {\tt i=1,$\dots$,20}. 
+
+\item
+The file {\tt
+const$\underline{\,\,}$and$\underline{\,\,}$model$\underline{\,\,}$param.dat}
+contains all constants and parameters (up to version 5.0 initialized in 
+ subroutine input or given in the 
+ input file discussed above), specific for models of the hadronic currents.
+
+First set of parameters defines physical constants: coupling
+constants, masses, and decay widths. The following values are used
+by default:  
+\begin{itemize}
+\item[]{$1/\alpha$ = 137.03599911 -- fine structure constant}
+
+\item[]{$m_e$ = 0.51099906 $\cdot 10^{-3}$ GeV -- electron mass}
+
+\item[]{$m_{p}$ = 0.938271998 GeV -- proton mass}
+
+\item[]{$m_{n}$ = 0.93956533 GeV -- neutron mass}
+
+\item[]{$m_{\mu}$ = 0.1056583568 GeV -- muon mass}
+
+\item[]{$m_{\pi^\pm}$ = 0.13957018 GeV -- charged pion mass}
+
+\item[]{$m_{\pi^0}$ = 0.1349766 GeV -- neutral pion mass}
+
+\item[]{$m_{K^\pm}$ = 0.493677 GeV -- charged kaon mass}
+
+\item[]{$m_{K^0}$ = 0.497672 GeV -- neutral kaon mass}
+
+\item[]{$m_{\Lambda}$ = 1.115683 GeV -- lambda mass}
+
+\end{itemize}
+For the parameterization of the form factors
+more constants are needed and their values are explicitly given
+ in the subroutine {\tt input} and are set by the user, if he wants
+ to modify the default values, by changing the appropriate values
+ in the file
+ const$\underline{\,\,}$and$\underline{\,\,}$model$\underline{\,\,}$param.dat .
+ 
+
+
+\section{Output}
+
+PHOKHARA presents the output information in several forms and 
+saves it in different files. 
+
+The four-momenta of the particles of the accepted events are stored in 
+the file given by {\tt outfile}. The format of the output is 
+determined by the subroutine {\tt writeevent(pion)} and can be changed 
+by the user. All the momenta are given in the centre-of-mass system of 
+the colliding electron and positron. 
+
+The subroutine {\tt inithisto} books the histograms being based on 
+the information given by the input file. The subroutine 
+{\tt endhisto} fills the histograms at the end of the 
+generation run and save the result in the output file. 
+The histogram 
+information is stored in the intermediate steeps of the calculation 
+in the matrix {\tt histo(i,j)}, where {\tt i} identifies the histogram 
+number and {\tt j} the bin and
+the user can use its favourite histograming 
+tool simply modifying the subroutines {\tt inithisto}
+and {\tt endhisto}, where the initialisation and filling the histograms
+ take place.
+
+By default only the $Q^2$ distribution, where $Q^2$ is the squared 
+invariant mass of the hadronic (muonic) system, is calculated. 
+The contribution from single photon events is stored in histogram 
+{\tt 1}. The contribution from two photon events is stored in 
+histogram {\tt 2}. The final $Q^2$ distribution is given 
+by the sum of both results. Other differential distributions
+can be defined though the subroutine {\tt addiere(wgt,qq,i)},
+where {\tt wgt} is the weight of the event, {\tt qq} is the 
+value of $Q^2$ and {\tt i} is equal to 1 for single photon events 
+and 2 for two photon events. The four-momenta of the events are
+given by the matrix {\tt momenta(i,0:3)}, where {\tt i=1,$\ldots$,7}, 
+for the positron, the electron, the two real photons (for single 
+photon events {\tt momenta(4,0:3)} is set to zero), 
+the virtual photon converting into hadrons, 
+the $\pi^+ (\mu^+, \bar{p}, \bar{n}, K^+,  K^0)$
+and $\pi^- (\mu^-, p, n, K^-,\bar K^0)$ respectively.
+In the three pion channel {\tt i=6,7,8} for the $\pi^+\pi^-\pi^0$ respectively
+ and in the four pion channels
+{\tt i=6,$\ldots$,9}  for the $\pi^0\pi^0\pi^-\pi^+$
+and $\pi^+\pi^-\pi^-\pi^+$ respectively. In the 
+$\Lambda (\to \pi^- p) \bar \Lambda (\to \pi^+ \bar p)$
+channel {\tt i=8,$\ldots$,11} for the $\pi^+ \bar p \pi^- p$ respectively.
+ For technical reasons the {\tt i=6,7} correspond to $\bar \Lambda\Lambda $ 
+ respectively.
+This matrix can be used by the user to define other
+ differential distributions. 
+
+At the end of the run, PHOKHARA displays also the total number of 
+accepted events, the value of the cross section, the value of the 
+scanned maximum(s) and the biggest value of the integrand(s) found 
+during the Monte Carlo generation. The last should be always smaller
+than the scanned maximum. If during the generation a value of 
+the integrand is found to be bigger than the scanned maximum,
+a warning is given. Then, the number of events used for the initial 
+scan should be increased. 
+
+\section{Forthcoming features}
+
+\begin{itemize}
+\item{Full one-loop radiative corrections for muon production.}
+\item{Simulation of narrow resonances ($J/\psi$ and $ \psi(2S)$)
+ in all generated channels}
+\item{Simulation of other exclusive hadronic channels.}
+\item{FSR for three pion production}
+\end{itemize}
+
+-------------------------------------------------------------------------
+%%%%%%%%%%%  BIBLIOGRAFIA  %%%%%%%%%%%%
+
+\begin{thebibliography}{99}
+
+\bibitem{Zerwas}
+Min-Shih Chen and P.~M.~Zerwas, 
+%"SECONDARY REACTIONS IN ELECTRON - POSITRON (ELECTRON) COLLISIONS"
+Phys. Rev. D {\bf 11} (1975) 58.
+%%CITATION = PHRVA,D11,58;%%
+
+\bibitem{Binner:1999bt}
+S.~Binner, J.~H.~K\"uhn and K.~Melnikov,
+%``Measuring sigma(e+ e- --> hadrons) using tagged photon,''
+Phys.\ Lett.\  {\bf B459} (1999) 279
+[hep-ph/9902399].
+%%CITATION = HEP-PH 9902399;%%
+
+\bibitem{Czyz:2007wi}
+  H.~Czy\.z, A.~Grzeli\'nska and J.~H.~K\"uhn,
+  %``Spin asymmetries and correlations in Lambda-pair production through the
+  %radiative return method,''
+   hep-ph/0702122.
+  %%CITATION = HEP-PH/0702122;%%
+
+\bibitem{Rodrigo:2001kf}
+G.~Rodrigo, H.~Czy\.z, J.~H.~K\"uhn and M.~Szopa,
+%``Radiative return at NLO and the measurement of the hadronic  cross-section in electron positron annihilation,''
+Eur.\ Phys.\ J.\ C {\bf 24} (2002) 71 [hep-ph/0112184].
+%%CITATION = HEP-PH 0112184;%%
+
+\bibitem{Rodrigo:2001jr}
+G.~Rodrigo, A.~Gehrmann-De Ridder, M.~Guilleaume and J.~H.~K\"uhn,
+%``NLO QED corrections to ISR in e+ e- annihilation and the measurement of  sigma(e+ e- $\to$ hadrons) using tagged photons,''
+Eur.\ Phys.\ J.\ C {\bf 22} (2001) 81
+[hep-ph/0106132].
+%%CITATION = HEP-PH 0106132;%%
+
+\bibitem{Czyz:2002np}
+H.~Czy{\.z}, A.~Grzeli{\'n}ska, J.~H.~K{\"u}hn and G.~Rodrigo,
+%``The radiative return at Phi- and B-factories: Small-angle photon  emission at next to leading order,''
+Eur.\ Phys.\ J.\ C {\bf 27} (2003) 563
+[hep-ph/0212225].
+%%CITATION = HEP-PH 0212225;%%
+
+\bibitem{Kuhn:2002xg}
+J.~H.~K\"uhn and G.~Rodrigo,
+%``The radiative return at small angles: Virtual corrections,''
+Eur.\ Phys.\ J.\ C {\bf 25} (2002) 215 [hep-ph/0204283].
+%%CITATION = HEP-PH 0204283;%%
+
+\bibitem{Rodrigo:2001cc}
+G.~Rodrigo,
+%``Radiative return at NLO and the measurement of the hadronic cross-section,''
+Acta Phys.\ Polon.\ B {\bf 32} (2001) 3833 [hep-ph/0111151].
+%%CITATION = HEP-PH 0111151;%%
+ 
+\bibitem{Czyz:2000wh}
+H.~Czy\.z and J.~H.~K\"uhn, 
+%``Four pion final states with tagged photons at electron positron  colliders,''
+Eur.\ Phys.\ J.\ C {\bf 18} (2001) 497
+[hep-ph/0008262].
+%%CITATION = HEP-PH 0008262;%%
+
+\bibitem{Czyz:2003np}
+H.~Czy\.z, A.~Grzeli\'nska, J.~H.~K\"uhn and G.~Rodrigo,
+%``The radiative return at Phi- and B-factories: FSR at next to leading order,''
+Eur.\ Phys.\ J.\ C {\bf 33} (2004) 333
+[hep-ph/0308312].
+%%CITATION = HEP-PH 0308312;%%
+
+
+\bibitem{Ustron_03_N}
+H.~Czy{\.z} and E.~Nowak, 
+%``e+ e- $\to$ pi+ pi- e+ e-: A potential background for sigma(e+ e- $\to$ pi+
+%pi-) measurement via radiative return method,''
+Acta Phys.\ Polon.\ B {\bf 34} (2003) 5231
+[hep-ph/0310335].
+%%CITATION = HEP-PH 0310335;%%
+
+\bibitem{Ustron_05_N}
+H.~Czy{\.z} and E.~Nowak-Kubat, 
+%"Radiative return via electron pair production: Monte Carlo
+% simulation of the process e+ e- --> pi+ pi- e+ e-"
+Acta Phys.\ Polon.\ B {\bf 36} (2005) 3425
+[hep-ph/0510287].
+%%CITATION = HEP-PH 0510287;%%
+
+\bibitem{Nowak}
+H.~Czy{\.z}, J.~H.~K{\"u}hn, E.~Nowak and G.~Rodrigo,
+%  ``NUCLEON FORM-FACTORS, B MESON FACTORIES AND THE RADIATIVE RETURN.''
+Eur.~Phys.~J.~C {\bf 35} (2004) 527 [hep-ph/0403062].
+%%CITATION = HEP-PH 0403062;%%
+
+\bibitem{Czyz:PH04}
+H.~Czy{\.z}, A.~Grzeli{\'n}ska, J.~H.~K{\"u}hn and G.~Rodrigo,
+%"The radiative return at Phi- and B-factories: FSR for muon
+%                  pair  production at next-to-leading order"
+Eur. \ Phys. \ J. \ C {\bf 39} (2005) 411 [hep-ph/0404078].
+%%CITATION = HEP-PH 0404078;%%
+
+\bibitem{Czyz:2005as}
+  H.~Czy\.z, A.~Grzeli\'nska, J.~H.~K\"uhn and G.~Rodrigo,
+  %``Electron positron annihilation into three pions and the radiative
+  %return,''
+  Eur.\ Phys.\ J.\ C {\bf 47} (2006) 617
+  [hep-ph/0512180].
+  %%CITATION = HEP-PH 0512180;%%
+
+\bibitem{Czyz:2004nq}
+  H.~Czy{\.z}, A.~Grzeli\'nska and J.~H.~K\"uhn,
+  %``Charge asymmetry and radiative Phi decays,''
+  Phys.\ Lett.\ B {\bf 611} (2005) 116
+  [hep-ph/0412239].
+  %%CITATION = HEP-PH 0412239;%%
+
+\bibitem{Kuhn:1990ad}
+J.~H.~K\"uhn and A.~Santamaria,
+%``Tau Decays To Pions,''
+Z.\ Phys.\ C {\bf 48} (1990) 445.
+%%CITATION = ZEPYA,C48,445;%%
+
+\bibitem{Khodj04}
+C.~Bruch, A.~Khodjamirian and J.~H.~K{\"u}hn,
+%Modeling the pion and kaon form factors in the timelike region"
+Eur. \ Phys. \ J. \ C {\bf 39} (2005) 41 [hep-ph/0409080].
+%%CITATION = HEP-PH 0409080;%%
+
+\bibitem{Pedlar:2005sj}
+  T.~K.~Pedlar {\it et al.}  [CLEO Collaboration],
+  %``Precision measurements of the timelike electromagnetic form factors of
+  %pion, kaon, and proton,''
+  hep-ex/0510005.
+  %%CITATION = HEP-EX 0510005;%%
+
+\bibitem{Jeg_web}
+F.~Jegerlehner, 
+http://www-com.physik.hu-berlin.de/$\sim$fjeger/alphaQED.uu
+(the version included in PHOKHARA was taken
+ from http://www-zeuthen.desy.de/fjeger/alphaQED.uu and thus
+ it is not updated)
+
+\bibitem{RANLUX}
+
+The unpublished double precision version of RANLUX written by M.~L\"uscher
+(F.~James - private communication):
+
+M.~L\"uscher
+Comput.Phys.Commun.79:100-110,1994 [hep-lat/9309020];
+% A PORTABLE HIGH QUALITY RANDOM NUMBER GENERATOR 
+% FOR LATTICE FIELD THEORY SIMULATIONS.
+F.~James, 
+%"RANLUX: A FORTRAN implementation of the high quality
+%                  pseudorandom number generator of Luscher"
+Comput.Phys.Commun. {\bf 79} (1994) 111.
+%%CITATION = HEP-LAT 9309020;%%
+%%CITATION = CPHCB,79,111;%%
+
+\bibitem{proc}
+J.~H.~K{\"u}hn
+%"Measuring sigma(e+ e- --> hadrons) with tagged photons at
+%                  electron positron colliders"
+Nucl. Phys. Proc. Suppl. {\bf 98} (2001) 289 [hep-ph/0101100].
+ G.~Rodrigo,
+%``Radiative return at NLO and the measurement of the hadronic cross section,''
+Acta Phys.\ Polon.\ B {\bf 32} (2001) 3833 [hep-ph/0111151].
+ G.~Rodrigo, H.~Czy\.z and J.~H.~K\"uhn,
+%``Radiative return at NLO: The PHO\-KHA\-RA Monte Carlo generator,''
+ hep-ph/0205097; Nucl.Phys.Proc.Suppl. {\bf 123} (2003) 167 [hep-ph/0210287];
+ Nucl.Phys.Proc.Suppl. {\bf 116} (2003) 249 [hep-ph/0211186].
+ H.~Czy{\.z} and A.~Grzeli{\'n}ska, 
+%``FSR at leading and next-to-leading order in the radiative return at meson
+%factories,''
+Acta Phys.\ Polon.\ B {\bf 34} (2003) 5219
+[hep-ph/0310341].
+ H.~Czy{\.z}, A.~Grzeli{\'n}ska, J.~H.~K{\"u}hn and G.~Rodrigo,
+%``Perspectives for the radiative return at meson factories,''
+Nucl.~Phys.~Proc.~Suppl. {\bf 131} (2004) 39 [hep-ph/0312217].
+  H.~Czy\.z and E.~Nowak-Kubat,
+  %``Radiative return via electron pair production: Monte Carlo simulation of
+  %the process e+ e- --> pi+ pi- e+ e-,''
+  Acta Phys.\ Polon.\ B {\bf 36} (2005) 3425
+  [hep-ph/0510287].
+  H.~Czy\.z, A.~Grzeli\'nska and E.~Nowak-Kubat,
+  %``Radiative return method as a tool in hadronic physics,''
+  Acta Phys.\ Polon.\ B {\bf 36} (2005) 3403
+  hep-ph/0510208].
+  H.~Czy\.z,
+  %``The radiative return method: A short theory review,''
+  Nucl.\ Phys.\ Proc.\ Suppl.\  {\bf 162} (2006) 76
+  [hep-ph/0606227].
+  H.~Czy\.z and E.~Nowak-Kubat,
+  %``The reaction e+ e- --> e+ e- pi+ pi- and the pion form factor  measurements
+  %via the radiative return method,''
+  Phys.\ Lett.\ B {\bf 634} (2006) 493
+  [hep-ph/0601169].
+%%CITATION = HEP-PH 0101100;%%
+%%CITATION = HEP-PH 0111151;%%                                                 
+%%CITATION = HEP-PH 0205097;%%
+%%CITATION = HEP-PH 0210287;%%
+%%CITATION = HEP-PH 0211186;%%
+%%CITATION = HEP-PH 0310341;%%
+%%CITATION = HEP-PH 0312217;%%
+%%CITATION = HEP-PH 0510287;%%
+%%CITATION = HEP-PH 0510208;%%
+%%CITATION = HEP-PH 0606227;%%
+%%CITATION = HEP-PH 0601169;%%
+\end{thebibliography}
+\end{document}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

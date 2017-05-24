@@ -1,0 +1,520 @@
+// -*- C++ -*-
+//
+// Package:     DumpDecayTreeProc
+// Module:      DumpDecayTreeProc
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      Hanna Mahlke-Krueger
+// Created:     Mon Jun 18 16:02:36 EDT 2001
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "DumpDecayTreeProc/DumpDecayTreeProc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "MCInfo/MCDecayTree/MCDecayTree.h"
+#include "MCInfo/MCDecayTree/MCParticle.h"
+#include "MCInfo/MCDecayTree/MCVertex.h"
+#include "MCInfo/MCParticleProperty/MCParticleProperty.h"
+
+#include "MCBeam/MCBeamParameters.h"
+#include "CesrCleoComm/CesrCrossingAngle.h"
+
+#include "CLHEP/Vector/LorentzRotation.h"
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+
+static double CosInJpsiRestFrame(double px_kk, double py_kk, double pz_kk, double e_kk,
+				 double px_jpsi, double py_jpsi, double pz_jpsi, double e_jpsi)
+{
+
+  double p1=px_jpsi;
+  double p2=py_jpsi;
+  double p3=pz_jpsi;
+  double p0=e_jpsi;
+
+  //cerr << "p(J/psi): " << p1 << " " << p2 << " " << p3 << " " << p0 << endl;
+
+  double s1=px_kk;
+  double s2=py_kk;
+  double s3=pz_kk;
+  double s0=e_kk;
+	   
+  //cerr << "p(KK): " << s1 << " " << s2 << " " << s3 << " " << s0 << endl;
+
+  double b1=p1/p0;
+  double b2=p2/p0;
+  double b3=p3/p0;
+  double b=sqrt(p1*p1+p2*p2+p3*p3)/p0;
+
+
+  //cerr << "beta: " << b1 << " " << b2 << " " << b3 << " " << b << endl;
+  double g=1./sqrt(1.-b*b);
+  double s10=g*s0+b1*g*s1+b2*g*s2+b3*g*s3;
+  double s11=b1*g*s0+(1.+(g-1.)*b1*b1/(b*b))*s1+((g-1.)*b1*b2/(b*b))*s2+((g-1.)*b1*b3/(b*b))*s3;
+  double s12=b2*g*s0+((g-1.)*b1*b2/(b*b))*s1+(1.+(g-1.)*b2*b2/(b*b))*s2+((g-1.)*b2*b3/(b*b))*s3;
+  double s13=b3*g*s0+((g-1.)*b1*b3/(b*b))*s1+((g-1.)*b2*b3/(b*b))*s2+(1.+(g-1.)*b3*b3/(b*b))*s3;
+
+
+  /***  
+  double s10 = s0;
+  double s11 = s1;
+  double s12 = s2;
+  double s13 = s3;
+  ***/
+
+  //cerr << "boosted p(KK): " << s11 << " " << s12 << " " << s13 << " " << s10 << endl;
+
+  double pp1=sqrt(s11*s11+s12*s12+s13*s13);
+  double pp2=sqrt(p1*p1+p2*p2+p3*p3);
+  double pp3=s11*p1+s12*p2+s13*p3;
+
+  //cerr << "cos theta: " << pp3/(pp1*pp2) << endl;
+
+  return pp3/(pp1*pp2);
+}
+
+
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.DumpDecayTreeProc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.17 2000/12/04 19:11:11 cdj Exp $";
+static const char* const kTagString = "$Name: v03_06_00 $";
+
+//
+// static data member definitions
+//
+
+//
+// constructors and destructor
+//
+DumpDecayTreeProc::DumpDecayTreeProc( void )               // anal1
+   : Processor( "DumpDecayTreeProc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &DumpDecayTreeProc::event,    Stream::kEvent );
+   //bind( &DumpDecayTreeProc::beginRun, Stream::kBeginRun );
+   //bind( &DumpDecayTreeProc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+}
+
+DumpDecayTreeProc::~DumpDecayTreeProc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+DumpDecayTreeProc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+DumpDecayTreeProc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+// ---------------- standard place to book histograms ---------------
+void
+DumpDecayTreeProc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   h_e = iHistoManager.histogram("e", 600, 0., 1.5);   
+
+/**
+   // book your histograms here
+   h_rec = iHistoManager.histogram("rec", 60, 3.5, 3.56);   
+
+   //h_costh = iHistoManager.histogram("costh", 20, -1., 1.);   
+   //h_costh = iHistoManager.histogram("costh", 40, -1., 1.);   
+
+   //h_e = iHistoManager.histogram("e", 100, 0., 1.);   
+   //h_e = iHistoManager.histogram("e", 100, 0., 5.);   
+
+   h_costh = iHistoManager.histogram("costh", 100, 0.5, 1.);   
+   h_e = iHistoManager.histogram("e", 100, 0., 0.5);   
+   h_e_costh = iHistoManager.histogram("e_costh", 100, 0., 0.5, 100, 0.5, 1.);   
+   h_tre_costh = iHistoManager.histogram("tre_costh", 100, 0., 4., 100, 0.5, 1.);   
+   h_e_tre = iHistoManager.histogram("e_tre", 100, 0., 0.5, 100, 0., 4.);   
+
+   h_etab_costh = iHistoManager.histogram("etab_costh", 100, 0.5, 1.);   
+   h_etab_e = iHistoManager.histogram("etab_e", 100, 0., 0.5);   
+   h_etab_e_costh = iHistoManager.histogram("etab_e_costh", 100, 0., 0.5, 100, 0.5, 1.);   
+   h_etab_tre_costh = iHistoManager.histogram("etab_tre_costh", 100, 0., 4., 100, 0.5, 1.);   
+   h_etab_e_tre = iHistoManager.histogram("etab_e_tre", 100, 0., 0.5, 100, 0., 4.);   
+**/
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+DumpDecayTreeProc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+/*
+   FAItem< MCBeamParameters > beam_params;
+   extract(iFrame.record(Stream::kStartRun), beam_params);
+   
+   cerr << *beam_params << endl;
+*/
+   // Let's extract the tree (no usage tag means we get the CLEOG tree)
+   FAItem< MCDecayTree > decayTree;
+
+///////////////////////////////////////////////////////////////////
+// NOTE: The first extract line is for dumping the cleog-level 
+//       decay tree, the later is for dumping the generator-level
+//       decay tree.
+
+//   extract(iFrame.record(Stream::kEvent), decayTree);
+
+   extract(iFrame.record(Stream::kEvent), decayTree, "Generator" );
+
+///////////////////////////////////////////////////////////////////
+
+   // Get a reference to it
+   const MCDecayTree& mcDecayTree(*decayTree);
+/**   
+   FAItem< CesrCrossingAngle >                    xAngle;
+   extract( iFrame.record( Stream::kStartRun ), xAngle );
+   //paramSet.setCrossingAngle( xAngle->value() );
+   cerr << "Crossing Angle = " << xAngle->value() << endl;
+**/
+
+
+
+   bool found = false;
+
+   for(MCDecayTree::const_pIterator it = decayTree->pBegin();
+       it != decayTree->pEnd(); it++) {
+
+      if( ( it->properties().PDGId() == 22 ) ) {
+//	 cerr << it->properties().name() << " " << it->energy() << endl;
+//	 if( (it->energy() > 0.9) && (it->energy() < 0.91) )
+//	 if( (it->energy() > 0.75) && (it->energy() < 0.77) )
+//	 if( (it->energy() > 0.75) && (it->energy() < 0.755) )
+	 if( (it->energy() > 0.75) && (it->energy() < 0.751) )
+	    found = true;
+	 
+	 h_e->fill(it->energy());
+      }
+      
+   }
+
+   if(!found)
+      return ActionBase::kFailed;
+
+   /**
+   // Let's just try to print it out
+   report(INFO, kFacilityString) << "About to dump decay tree" << endl;
+   report(INFO, kFacilityString) << mcDecayTree << endl;
+   **/
+
+
+/*
+   HepLorentzVector jpsi4v, kp4v, km4v, gam4v;
+
+   for(MCDecayTree::const_pIterator it = decayTree->pBegin();
+       it != decayTree->pEnd(); it++) {
+
+      //if( ( it->properties().PDGId() == 100022 ) ) {
+      if( ( it->properties().PDGId() == 22 ) ) {
+	 const MCVertex* psiVtx = it->productionVertex();
+	 const MCParticle& parent = (*psiVtx).parent();
+	 const MCParticleProperty& parentProp = parent.properties();
+
+	 //cout << *psiVtx << endl;
+	 //cout << parentProp.PDGId() << endl;
+	 //cout << *it << endl;
+
+	 double least_costh = -10.;
+	 double tr_en = 10.;
+
+	 for(MCDecayTree::const_pIterator it2 = decayTree->pBegin();
+	     it2 != decayTree->pEnd(); it2++) {
+	    
+	    if( ( it2->properties().QQId() == 21 )
+		|| ( it2->properties().QQId() == 22 ) ) {
+	       double costh = ( it->momentum().dot(it2->momentum()) )
+		  / ( it->pmag() * it2->pmag() ) ; 
+	       //if( costh < least_costh )
+	       if( costh > least_costh ) {
+		  least_costh = costh;
+		  tr_en = it2->energy();
+	       }
+	    } 
+	 }
+	 
+	 //cout << it->lorentzMomentum() << endl;
+	 //cout << least_costh << endl;
+
+	 h_costh->fill(least_costh);
+	 h_e->fill(it->pmag());
+	 h_e_costh->fill(it->pmag(), least_costh);
+	 h_tre_costh->fill(tr_en, least_costh);
+	 h_e_tre->fill(it->pmag(), tr_en);
+
+	 if(parentProp.PDGId() != 553) continue;
+
+	 h_etab_costh->fill(least_costh);
+	 h_etab_e->fill(it->pmag());
+	 h_etab_e_costh->fill(it->pmag(), least_costh);
+	 h_etab_tre_costh->fill(tr_en, least_costh);
+	 h_etab_e_tre->fill(it->pmag(), tr_en);
+	 
+	 //cout << parent << endl;
+
+
+//	 double costh = ( it->momentum().dot(parent.momentum()) )
+//	    / ( it->pmag() * parent.pmag() ) ;
+//	 h_costh->fill(costh);
+
+
+      }
+
+*/
+
+/**
+      if( ( it->properties().QQId() == 21 )
+	  || ( it->properties().QQId() == 22 ) ) {
+	 h_e->fill(it->pmag());
+      }
+**/
+
+/**
+      // the transition gamma
+      if( it->properties().PDGId() == 22 ) {
+
+	 const MCVertex* psiVtx = it->productionVertex();
+	 const MCParticle& parent = (*psiVtx).parent();
+
+	 if( parent.properties().PDGId() == 553 ) {
+	    gam4v = it->lorentzMomentum();
+	    
+	    //cerr << gam4v.e() << endl;
+
+	    //const MCVertex* psiVtx = it->productionVertex();
+	    //const MCParticle& parent = (*psiVtx).parent();
+	    //const MCParticleProperty& parentProp = parent.properties();
+	    
+	    h_e->fill(gam4v.e());
+	 }
+      }
+**/	 
+
+////   }
+
+
+
+
+/*
+   for(MCDecayTree::const_vIterator it = decayTree->vBegin();
+       it != decayTree->vEnd(); it++) {
+
+      if(it->parent().properties().name() == "pi0") {
+	 double pi0_px = it->parent().px();
+	 double pi0_py = it->parent().py();
+	 double pi0_pz = it->parent().pz();
+	 double pi0_e  = it->parent().energy();
+
+	 double rec_mass = sqrt(fabs(pow(3.686-pi0_e,2) - pow(pi0_px,2)
+				     - pow(pi0_py,2) - pow(pi0_pz,2) ));
+	 h_rec->fill(rec_mass);
+
+	 cerr << "pi0 recoil mass: " << rec_mass << endl;
+      }
+   }
+*/
+/**
+   HepLorentzVector jpsi4v, kp4v, km4v, gam4v;
+
+   for(MCDecayTree::const_pIterator it = decayTree->pBegin();
+       it != decayTree->pEnd(); it++) {
+
+      // J/psi
+      if( it->properties().PDGId() == 443 ) {
+	 //cout << it->lorentzMomentum() << endl;
+
+	 jpsi4v = it->lorentzMomentum();
+      }
+
+      // K+
+      if( it->properties().PDGId() == 321 ) {
+	 kp4v = it->lorentzMomentum();
+      }
+
+      // K-
+      if( it->properties().PDGId() == -321 ) {
+	 km4v = it->lorentzMomentum();
+      }
+
+      // the transition gamma
+      if( it->properties().PDGId() == 22 ) {
+	 //gam4v = it->lorentzMomentum();
+
+	 const MCVertex* psiVtx = it->productionVertex();
+	 const MCParticle& parent = (*psiVtx).parent();
+	 const MCParticleProperty& parentProp = parent.properties();
+//
+	 // Jpsi -> gamma f_0
+	 //if(50666 ==  parentProp.PDGId()){
+	    gam4v = it->lorentzMomentum();
+	    //}	 
+      }
+
+   }
+**/
+
+   //HepLorentzVector kk4v = kp4v + km4v;
+
+/**
+   cerr << "K+:    " << kp4v << endl;
+   cerr << "K-:    " << km4v << endl;
+   cerr << "KK:    " << kk4v << endl;
+   cerr << "J/psi: " << jpsi4v << endl;
+   cerr << "gamma: " << gam4v << endl;
+**/
+/**
+   cerr << CosInJpsiRestFrame(kk4v.x(),kk4v.y(),kk4v.z(),kk4v.t(),
+			      jpsi4v.x(),jpsi4v.y(),jpsi4v.z(),jpsi4v.t()) << endl;;
+   
+   cerr << (kk4v.vect().dot(jpsi4v.vect())) 
+      / (kk4v.vect().mag() * jpsi4v.vect().mag()) << endl;
+**/
+
+/***
+   h_costh->fill(CosInJpsiRestFrame(kk4v.x(),kk4v.y(),kk4v.z(),kk4v.t(),
+				    jpsi4v.x(),jpsi4v.y(),jpsi4v.z(),jpsi4v.t()));
+***/
+
+   /**
+   kk4v.boost(jpsi4v.boostVector());
+   gam4v.boost(jpsi4v.boostVector());
+   **/
+
+   /*
+   HepLorentzRotation invb(jpsi4v.boostVector());
+   invb.invert();
+   kk4v.transform(invb);
+   //gam4v.transform(invb);
+
+   HepDouble CosTheta = kk4v.pz() / kk4v.vect().mag();
+   h_costh->fill(CosTheta);
+   */
+
+/**
+   cerr << (kk4v.vect().dot(jpsi4v.vect())) 
+      / (kk4v.vect().mag() * jpsi4v.vect().mag()) << endl;
+   cerr << (gam4v.vect().dot(jpsi4v.vect())) 
+      / (gam4v.vect().mag() * jpsi4v.vect().mag()) << endl;
+**/
+/**
+   h_costh->fill(kk4v.vect().dot(jpsi4v.vect())
+		 / (kk4v.vect().mag() * jpsi4v.vect().mag()));
+**/
+
+/***
+   HepLorentzRotation invb(jpsi4v.boostVector());
+   invb.invert();
+   gam4v.transform(invb);
+   
+   //HepDouble CosTheta = gam4v.cosTheta();
+   HepDouble CosTheta = gam4v.pz() / gam4v.vect().mag();
+   h_costh->fill(CosTheta);
+***/
+
+   return ActionBase::kPassed;
+}
+
+/*
+ActionBase::ActionResult
+DumpDecayTreeProc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+/*
+ActionBase::ActionResult
+DumpDecayTreeProc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//
+

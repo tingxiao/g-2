@@ -1,0 +1,1330 @@
+// -*- C++ -*-
+//
+// Package:     TrEffProc
+// Module:      TrEffProc
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      pts/1
+// Created:     Wed May 12 17:15:38 CDT 2010
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "TrEffProc/TrEffProc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+#include "HistogramInterface/HINtupleVarNames.h"
+#include "HistogramInterface/HINtupleArray.h"
+#include "HistogramInterface/HIHist1D.h"
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+#include "Navigation/NavShowerServer.h"
+#include "C3ccProd/CcFortranShowerCorrector.h"
+#include "C3Mu/MuTrack.h"
+#include "Navigation/NavMuonId.h"
+
+//I added the following at the suggestion of the NavShower web page
+#include "Navigation/NavConReg.h"
+#include "KinematicTrajectory/KTKinematicData.h"
+#include "Navigation/NavTkShMatch.h"
+#include "C3cc/CcAssignedEnergyHit.h"
+
+#include "Navigation/NavTrack.h"
+#include "TrackRoot/TRHelixFit.h"
+#include "TrackRoot/TRTrackFitQuality.h"
+#include "TrackRoot/TRSeedTrackQuality.h"
+#include "TrackDelivery/TDKinematicFit.h"
+#include "Navigation/NavElecId.h"
+
+#include "FitEvt/FitEvtSettings.h"
+#include "FitEvt/FitEvt.h"
+#include "BeamEnergy/BeamEnergy.h"
+#include "MagField/MagneticField.h"
+#include "MagField/MFFieldMap.h"
+#include "BeamSpot/BeamSpot.h"
+
+#include "MCBeam/MCTrueRfBucket.h"
+#include "MCTriggerPhase/MCTriggerPhase.h"
+
+#include "CleoDB/DBEventHeader.h"
+#include "TriggerData/TriggerData.h"
+#include "TriggerL1Data/TriggerL1Data.h"
+#include "Level4Proc/Level4Decision.h"
+
+#include "LabNet4Momentum/LabNet4Momentum.h"
+
+//RICH example
+#include "Navigation/NavRich.h"
+//Dedx example
+#include "DedxInfo/DedxInfo.h"
+
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.TrEffProc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.41 2006/02/08 19:38:02 wsun Exp $";
+static const char* const kTagString = "$Name: v07_03_00 $";
+
+//
+// static data member definitions
+//
+
+
+
+//
+// constructors and destructor
+//
+TrEffProc::TrEffProc( void )               // anal1
+   : Processor( "TrEffProc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &TrEffProc::event,    Stream::kEvent );
+   bind( &TrEffProc::beginRun, Stream::kBeginRun );
+   //bind( &TrEffProc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+TrEffProc::~TrEffProc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+TrEffProc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+TrEffProc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+
+enum {
+e,th,phi,e925, // ISR shower
+n1track, n2track, // 1 or 2 tracks
+pin1tag,pin1tag1,pin1tag2, // only 1 tagged track
+pin2tag, pin2probe1, pin2probe2, // 2 tagged tracks
+mun1tag,mun1tag1,mun1tag2, // only 1 tagged track
+mun2tag, mun2probe1, mun2probe2, // 2 tagged tracks
+kn1tag,kn1tag1,kn1tag2, // only 1 tagged track
+kn2tag, kn2probe1, kn2probe2, // 2 tagged tracks
+pite0,pipx0,pipy0,pipz0, // the first track to be found
+pite1,pipx1,pipy1,pipz1, // the second track to be calculated
+pite2,pipx2,pipy2,pipz2, // the second track to be found
+pite3,pipx3,pipy3,pipz3, // the first track to be calculated
+mute0,mupx0,mupy0,mupz0, // the first track to be found
+mute1,mupx1,mupy1,mupz1, // the second track to be calculated
+mute2,mupx2,mupy2,mupz2, // the second track to be found
+mute3,mupx3,mupy3,mupz3, // the first track to be calculated
+kte0,kpx0,kpy0,kpz0, // the first track to be found
+kte1,kpx1,kpy1,kpz1, // the second track to be calculated
+kte2,kpx2,kpy2,kpz2, // the second track to be found
+kte3,kpx3,kpy3,kpz3, // the first track to be calculated
+pisigma1,pisigma2,pill1,pill2,
+musigma1,musigma2,mull1,mull2,
+ksigma1,ksigma2,kll1,kll2,     // pid
+costhpi1,costhpi2,  
+costhmu1,costhmu2,
+costhk1,costhk2,// the angle between the calculated and probed tracks
+me1,eop1,me2,eop2,  //matched energy and E/p
+mudepth1,mudepth2,  //muon depth 
+chisqvtxpi0,chisqfitpi0, // missing energy fit, 1 track only
+chisqvtxpi1,chisqfitpi1, // missing energy fit, first track in 2 tracks events
+chisqvtxpi2,chisqfitpi2, // missing energy fit, second track in 2 tracks events
+chisqvtxmu0,chisqfitmu0, // missing energy fit, 1 track only
+chisqvtxmu1,chisqfitmu1, // missing energy fit, first track in 2 tracks events
+chisqvtxmu2,chisqfitmu2, // missing energy fit, second track in 2 tracks events
+chisqvtxk0,chisqfitk0, // missing energy fit, 1 track only
+chisqvtxk1,chisqfitk1, // missing energy fit, first track in 2 tracks events
+chisqvtxk2,chisqfitk2, // missing energy fit, second track in 2 tracks events
+charge1, charge2, //charges of the 2 tracks
+l1trigger1,l1trigger2,l1trigger3,l1trigger4,l1trigger5,l1trigger6,l1trigger7,l1trigger8,
+l1trigger9,l1trigger10,l1trigger11,l1trigger12,l1trigger13,l1trigger14,l1trigger15,l1trigger16,
+
+kVarNum};
+
+void
+TrEffProc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+
+   HINtupleVarNames ntupleNames(kVarNum);
+
+   ntupleNames.addVar(e,          "e");
+   ntupleNames.addVar(th,        "th");
+   ntupleNames.addVar(phi,       "phi");
+   ntupleNames.addVar(e925,     "e925");
+
+   ntupleNames.addVar(n1track,     "n1track");
+   ntupleNames.addVar(n2track,     "n2track");
+
+   ntupleNames.addVar(pin1tag,     "pin1tag");
+   ntupleNames.addVar(pin1tag1,     "pin1tag1");
+   ntupleNames.addVar(pin1tag2,     "pin1tag2");
+   ntupleNames.addVar(pin2tag,     "pin2tag");
+   ntupleNames.addVar(pin2probe1,   "pin2probe1");
+   ntupleNames.addVar(pin2probe2,   "pin2probe2");
+   ntupleNames.addVar(mun1tag,     "mun1tag");
+   ntupleNames.addVar(mun1tag1,     "mun1tag1");
+   ntupleNames.addVar(mun1tag2,     "mun1tag2");
+   ntupleNames.addVar(mun2tag,     "mun2tag");
+   ntupleNames.addVar(mun2probe1,   "mun2probe1");
+   ntupleNames.addVar(mun2probe2,   "mun2probe2");
+   ntupleNames.addVar(kn1tag,     "kn1tag");
+   ntupleNames.addVar(kn1tag1,     "kn1tag1");
+   ntupleNames.addVar(kn1tag2,     "kn1tag2");
+   ntupleNames.addVar(kn2tag,     "kn2tag");
+   ntupleNames.addVar(kn2probe1,   "kn2probe1");
+   ntupleNames.addVar(kn2probe2,   "kn2probe2");
+
+   ntupleNames.addVar(pite0,    "pite0");
+   ntupleNames.addVar(pipx0,    "pipx0");
+   ntupleNames.addVar(pipy0,    "pipy0");
+   ntupleNames.addVar(pipz0,    "pipz0");
+   ntupleNames.addVar(pite1,    "pite1");
+   ntupleNames.addVar(pipx1,    "pipx1");
+   ntupleNames.addVar(pipy1,    "pipy1");
+   ntupleNames.addVar(pipz1,    "pipz1");
+   ntupleNames.addVar(pite2,    "pite2");
+   ntupleNames.addVar(pipx2,    "pipx2");
+   ntupleNames.addVar(pipy2,    "pipy2");
+   ntupleNames.addVar(pipz2,    "pipz2");
+   ntupleNames.addVar(pite3,    "pite3");
+   ntupleNames.addVar(pipx3,    "pipx3");
+   ntupleNames.addVar(pipy3,    "pipy3");
+   ntupleNames.addVar(pipz3,    "pipz3");
+
+   ntupleNames.addVar(mute0,    "mute0");
+   ntupleNames.addVar(mupx0,    "mupx0");
+   ntupleNames.addVar(mupy0,    "mupy0");
+   ntupleNames.addVar(mupz0,    "mupz0");
+   ntupleNames.addVar(mute1,    "mute1");
+   ntupleNames.addVar(mupx1,    "mupx1");
+   ntupleNames.addVar(mupy1,    "mupy1");
+   ntupleNames.addVar(mupz1,    "mupz1");
+   ntupleNames.addVar(mute2,    "mute2");
+   ntupleNames.addVar(mupx2,    "mupx2");
+   ntupleNames.addVar(mupy2,    "mupy2");
+   ntupleNames.addVar(mupz2,    "mupz2");
+   ntupleNames.addVar(mute3,    "mute3");
+   ntupleNames.addVar(mupx3,    "mupx3");
+   ntupleNames.addVar(mupy3,    "mupy3");
+   ntupleNames.addVar(mupz3,    "mupz3");
+
+   ntupleNames.addVar(kte0,    "kte0");
+   ntupleNames.addVar(kpx0,    "kpx0");
+   ntupleNames.addVar(kpy0,    "kpy0");
+   ntupleNames.addVar(kpz0,    "kpz0");
+   ntupleNames.addVar(kte1,    "kte1");
+   ntupleNames.addVar(kpx1,    "kpx1");
+   ntupleNames.addVar(kpy1,    "kpy1");
+   ntupleNames.addVar(kpz1,    "kpz1");
+   ntupleNames.addVar(kte2,    "kte2");
+   ntupleNames.addVar(kpx2,    "kpx2");
+   ntupleNames.addVar(kpy2,    "kpy2");
+   ntupleNames.addVar(kpz2,    "kpz2");
+   ntupleNames.addVar(kte3,    "kte3");
+   ntupleNames.addVar(kpx3,    "kpx3");
+   ntupleNames.addVar(kpy3,    "kpy3");
+   ntupleNames.addVar(kpz3,    "kpz3");
+
+   ntupleNames.addVar(pisigma1, "pisigma1");
+   ntupleNames.addVar(pisigma2, "pisigma2");
+   ntupleNames.addVar(pill1, "pill1");
+   ntupleNames.addVar(pill2, "pill2");
+   ntupleNames.addVar(musigma1, "musigma1");
+   ntupleNames.addVar(musigma2, "musigma2");
+   ntupleNames.addVar(mull1, "mull1");
+   ntupleNames.addVar(mull2, "mull2");
+   ntupleNames.addVar(ksigma1, "ksigma1");
+   ntupleNames.addVar(ksigma2, "ksigma2");
+   ntupleNames.addVar(kll1, "kll1");
+   ntupleNames.addVar(kll2, "kll2");
+
+
+   ntupleNames.addVar(costhpi1,   "costhpi1");
+   ntupleNames.addVar(costhpi2,   "costhpi2");
+   ntupleNames.addVar(costhmu1,   "costhmu1");
+   ntupleNames.addVar(costhmu2,   "costhmu2");
+   ntupleNames.addVar(costhk1,   "costhk1");
+   ntupleNames.addVar(costhk2,   "costhk2");
+   ntupleNames.addVar(me1,          "me1");
+   ntupleNames.addVar(eop1,          "eop1");
+   ntupleNames.addVar(me2,          "me2");
+   ntupleNames.addVar(eop2,          "eop2");
+
+   ntupleNames.addVar(mudepth1,      "mudepth1");
+   ntupleNames.addVar(mudepth2,      "mudepth2");
+
+   ntupleNames.addVar(chisqvtxpi0,          "chisqvtxpi0");
+   ntupleNames.addVar(chisqfitpi0,          "chisqfitpi0");
+   ntupleNames.addVar(chisqvtxpi1,          "chisqvtxpi1");
+   ntupleNames.addVar(chisqfitpi1,          "chisqfitpi1");
+   ntupleNames.addVar(chisqvtxpi2,          "chisqvtxpi2");
+   ntupleNames.addVar(chisqfitpi2,          "chisqfitpi2");
+   ntupleNames.addVar(chisqvtxmu0,          "chisqvtxmu0");
+   ntupleNames.addVar(chisqfitmu0,          "chisqfitmu0");
+   ntupleNames.addVar(chisqvtxmu1,          "chisqvtxmu1");
+   ntupleNames.addVar(chisqfitmu1,          "chisqfitmu1");
+   ntupleNames.addVar(chisqvtxmu2,          "chisqvtxmu2");
+   ntupleNames.addVar(chisqfitmu2,          "chisqfitmu2");
+   ntupleNames.addVar(chisqvtxk0,          "chisqvtxk0");
+   ntupleNames.addVar(chisqfitk0,          "chisqfitk0");
+   ntupleNames.addVar(chisqvtxk1,          "chisqvtxk1");
+   ntupleNames.addVar(chisqfitk1,          "chisqfitk1");
+   ntupleNames.addVar(chisqvtxk2,          "chisqvtxk2");
+   ntupleNames.addVar(chisqfitk2,          "chisqfitk2");
+
+   ntupleNames.addVar(charge1,    "charge1");
+   ntupleNames.addVar(charge2,    "charge2");
+
+   ntupleNames.addVar(l1trigger1,          "l1trigger1");
+   ntupleNames.addVar(l1trigger2,          "l1trigger2");
+   ntupleNames.addVar(l1trigger3,          "l1trigger3");
+   ntupleNames.addVar(l1trigger4,          "l1trigger4");
+   ntupleNames.addVar(l1trigger5,          "l1trigger5");
+   ntupleNames.addVar(l1trigger6,          "l1trigger6");
+   ntupleNames.addVar(l1trigger7,          "l1trigger7");
+   ntupleNames.addVar(l1trigger8,          "l1trigger8");
+   ntupleNames.addVar(l1trigger9,          "l1trigger9");
+   ntupleNames.addVar(l1trigger10,          "l1trigger10");
+   ntupleNames.addVar(l1trigger11,          "l1trigger11");
+   ntupleNames.addVar(l1trigger12,          "l1trigger12");
+   ntupleNames.addVar(l1trigger13,          "l1trigger13");
+   ntupleNames.addVar(l1trigger14,          "l1trigger14");
+   ntupleNames.addVar(l1trigger15,          "l1trigger15");
+   ntupleNames.addVar(l1trigger16,          "l1trigger16");
+
+   m_showerTuple = iHistoManager.ntuple(10,"tuple", kVarNum, 10000, ntupleNames.names());
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+TrEffProc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   double E = -1000.;
+   double Theta = 0.;
+   double Phi = 0.;
+   double E925 = 0.;
+
+
+   bool N1TRACK = 0;
+   bool N2TRACK = 0;
+
+   bool PIN1TAG = 0;
+   bool PIN1TAG1 = 0;
+   bool PIN1TAG2 = 0;
+   bool PIN2TAG = 0;
+   bool PIN2PROBE1 = 0;
+   bool PIN2PROBE2 = 0;
+   bool MUN1TAG = 0;
+   bool MUN1TAG1 = 0;
+   bool MUN1TAG2 = 0;
+   bool MUN2TAG = 0;
+   bool MUN2PROBE1 = 0;
+   bool MUN2PROBE2 = 0;
+   bool KN1TAG = 0;
+   bool KN1TAG1 = 0;
+   bool KN1TAG2 = 0;
+   bool KN2TAG = 0;
+   bool KN2PROBE1 = 0;
+   bool KN2PROBE2 = 0;
+
+   double PIPE0 = -1000.;
+   double PIPX0 = -1000.;
+   double PIPY0 = -1000.;
+   double PIPZ0 = -1000.;
+   double PIPE1 = -1000.;
+   double PIPX1 = -1000.;
+   double PIPY1 = -1000.;
+   double PIPZ1 = -1000.;
+   double PIPE2 = -1000.;
+   double PIPX2 = -1000.;
+   double PIPY2 = -1000.;
+   double PIPZ2 = -1000.;
+   double PIPE3 = -1000.;
+   double PIPX3 = -1000.;
+   double PIPY3 = -1000.;
+   double PIPZ3 = -1000.;
+
+   double MUPE0 = -1000.;
+   double MUPX0 = -1000.;
+   double MUPY0 = -1000.;
+   double MUPZ0 = -1000.;
+   double MUPE1 = -1000.;
+   double MUPX1 = -1000.;
+   double MUPY1 = -1000.;
+   double MUPZ1 = -1000.;
+   double MUPE2 = -1000.;
+   double MUPX2 = -1000.;
+   double MUPY2 = -1000.;
+   double MUPZ2 = -1000.;
+   double MUPE3 = -1000.;
+   double MUPX3 = -1000.;
+   double MUPY3 = -1000.;
+   double MUPZ3 = -1000.;
+
+   double KPE0 = -1000.;
+   double KPX0 = -1000.;
+   double KPY0 = -1000.;
+   double KPZ0 = -1000.;
+   double KPE1 = -1000.;
+   double KPX1 = -1000.;
+   double KPY1 = -1000.;
+   double KPZ1 = -1000.;
+   double KPE2 = -1000.;
+   double KPX2 = -1000.;
+   double KPY2 = -1000.;
+   double KPZ2 = -1000.;
+   double KPE3 = -1000.;
+   double KPX3 = -1000.;
+   double KPY3 = -1000.;
+   double KPZ3 = -1000.;
+
+   double LABPE = -1000.;
+   double LABPX = -1000.;
+   double LABPY = -1000.;
+   double LABPZ = -1000.;
+
+   double CHARGEPI0 = 0.;
+   double CHARGEPI1 = 0.;
+   double CHARGEPI2 = 0.;
+   double CHARGEPI3 = 0.;
+   double CHARGEMU0 = 0.;
+   double CHARGEMU1 = 0.;
+   double CHARGEMU2 = 0.;
+   double CHARGEMU3 = 0.;
+   double CHARGEK0 = 0.;
+   double CHARGEK1 = 0.;
+   double CHARGEK2 = 0.;
+   double CHARGEK3 = 0.;
+
+   double PISIGMA1 = -1000.;
+   double PISIGMA2 = -1000.;
+   double MUSIGMA1 = -1000.;
+   double MUSIGMA2 = -1000.;
+   double KSIGMA1 = -1000.;
+   double KSIGMA2 = -1000.;
+   double PILL1 = -1000.;
+   double PILL2 = -1000.;
+   double MULL1 = -1000.;
+   double MULL2 = -1000.;
+   double KLL1 = -1000.;
+   double KLL2 = -1000.;
+
+   double COSTHPIPI1 = 0.;
+   double COSTHPIPI2 = 0.;
+   double COSTHPIMU1 = 0.;
+   double COSTHPIMU2 = 0.;
+   double COSTHPIK1 = 0.;
+   double COSTHPIK2 = 0.;
+
+   double COSTHMUPI1 = 0.;
+   double COSTHMUPI2 = 0.;
+   double COSTHMUMU1 = 0.;
+   double COSTHMUMU2 = 0.;
+   double COSTHMUK1 = 0.;
+   double COSTHMUK2 = 0.;
+
+   double COSTHKPI1 = 0.;
+   double COSTHKPI2 = 0.;
+   double COSTHKMU1 = 0.;
+   double COSTHKMU2 = 0.;
+   double COSTHKK1 = 0.;
+   double COSTHKK2 = 0.;
+
+   double EOP1 = 0.;
+   double EOP2 = 0.;
+   double ME1 = 0.;
+   double ME2 = 0.;
+   double MUDEPTH1 = 0.;
+   double MUDEPTH2 = 0.;
+
+   double CHISQVTXPI0 = 1000.;
+   double CHISQFITPI0 = 1000.;
+   double CHISQVTXPI1 = 1000.;
+   double CHISQFITPI1 = 1000.;
+   double CHISQVTXPI2 = 1000.;
+   double CHISQFITPI2 = 1000.;
+   double CHISQVTXMU0 = 1000.;
+   double CHISQFITMU0 = 1000.;
+   double CHISQVTXMU1 = 1000.;
+   double CHISQFITMU1 = 1000.;
+   double CHISQVTXMU2 = 1000.;
+   double CHISQFITMU2 = 1000.;
+   double CHISQVTXK0 = 1000.;
+   double CHISQFITK0 = 1000.;
+   double CHISQVTXK1 = 1000.;
+   double CHISQFITK1 = 1000.;
+   double CHISQVTXK2 = 1000.;
+   double CHISQFITK2 = 1000.;
+
+   double L1TRIGGER1 = 0.;
+   double L1TRIGGER2 = 0.;
+   double L1TRIGGER3 = 0.;
+   double L1TRIGGER4 = 0.;
+   double L1TRIGGER5 = 0.;
+   double L1TRIGGER6 = 0.;
+   double L1TRIGGER7 = 0.;
+   double L1TRIGGER8 = 0.;
+   double L1TRIGGER9 = 0.;
+   double L1TRIGGER10 = 0.;
+   double L1TRIGGER11 = 0.;
+   double L1TRIGGER12 = 0.;
+   double L1TRIGGER13 = 0.;
+   double L1TRIGGER14 = 0.;
+   double L1TRIGGER15 = 0.;
+   double L1TRIGGER16 = 0.;
+
+   float tuple[kVarNum];
+
+
+// if we're in MC, check to see if the trigger fired
+   FAItem< DBEventHeader > eventHeader ;
+   extract( iFrame.record( Stream::kEvent ), eventHeader ) ;
+
+   double the_run = eventHeader->run();
+   double the_evt = eventHeader->number();
+
+//   if( eventHeader->monteCarlo() ) {
+   double L1Trigger = 0., L4Decision = 0.;
+
+////////////////////////////////////////////////////////////////////////////
+// Trigger L1
+////////////////////////////////////////////////////////////////////////////
+//   int l1Trigger = 0, l1Trigger_Sel = 0, l1Trigger_Hadron = 0;
+//   int l1Trigger_MuPair = 0, l1Trigger_ElTrack = 0, l1Trigger_RadTau = 0;
+//   int l1Trigger_TwoTrack = 0;
+
+      FAItem< TriggerL1Data > trigDat;
+      extract (iFrame.record(Stream::kEvent), trigDat);
+
+// All possible trigger lines
+// --------------------------
+// DABoolean isHadron() const;  //Ax track > 2 & CB lo > 0
+// DABoolean isMuPair() const;  //Hi track > 1 & Back-to-back, 1 vs. 3/24
+// DABoolean isElTrack() const;  //Ax track > 0 & CB med > 0
+// DABoolean isRadTau() const;  //Stereo (hi + low) track > 1 & CB lo > 0
+// DABoolean isBarrelBhabha() const; //Back-to-back Hi CB clusters
+
+// DABoolean isCBSingleHi() const;  //CB hi > 0
+// DABoolean isCESingleHi() const;  //CE hi > 0
+// DABoolean isEndcapBhabha() const; //CE hi clusters in opposite ends
+// DABoolean isTwoTrack() const; //Ax track > 1
+// DABoolean isPulser() const;  //Pulser trigger
+// DABoolean isRandom() const;  //Random trigger
+// DABoolean isMinBias() const; //Tracking or CB Timing bit (Ax>0 || CB lo>1)
+      // Decode trigger line information //
+
+      // L1 Accept if any trigger line fires
+
+      if(trigDat->isHadron()) {
+        L1Trigger = 1.;
+        L1TRIGGER1 = 1.;
+      }
+      if(trigDat->isRadTau()) {
+        L1Trigger = 2.;
+        L1TRIGGER2 = 1.;
+      }
+      if(trigDat->isElTrack()) {
+        L1Trigger = 3.;
+        L1TRIGGER3 = 1.;
+      }
+      if(trigDat->isBarrelBhabha()) {
+        L1Trigger = 4.;
+        L1TRIGGER4 = 1.;
+      }
+      if(trigDat->isEndcapBhabha()) {
+        L1Trigger = 5.;
+        L1TRIGGER5 = 1.;
+      }
+      if(trigDat->isMuPair()) {
+        L1Trigger = 6.;
+        L1TRIGGER6 = 1.;
+      }
+      if(trigDat->isCBSingleHi()) {
+        L1Trigger = 7.;
+        L1TRIGGER7 = 1.;
+      }
+      if(trigDat->isCESingleHi()) {
+        L1Trigger = 8.;
+        L1TRIGGER8 = 1.;
+      }
+      if(trigDat->isPulser()) {
+        L1Trigger = 9.;
+        L1TRIGGER9 = 1.;
+      }
+      if(trigDat->isRandom()) {
+        L1Trigger = 10.;
+        L1TRIGGER10 = 1.;
+      }
+      if(trigDat->isTwoTrack()) {
+        L1Trigger = 11.;
+        L1TRIGGER11 = 1.;
+      }
+      if(trigDat->isMinBias()) {
+        L1Trigger = 12.;
+        L1TRIGGER12 = 1.;
+      }
+      if(trigDat->isPhotonA()) {
+        L1Trigger = 13.;
+        L1TRIGGER13 = 1.;
+      }
+      if(trigDat->isPhotonB()) {
+        L1Trigger = 14.;
+        L1TRIGGER14 = 1.;
+      }
+      if(trigDat->isPhotonC()) {
+        L1Trigger = 15.;
+        L1TRIGGER15 = 1.;
+      }
+      if(trigDat->isPhotonD()) {
+        L1Trigger = 16.;
+        L1TRIGGER16 = 1.;
+      }
+
+      // L1 Accept if any non-prescaled trigger line fires
+//   if ( (trigDat->isHadron())       ||
+//      (trigDat->isMuPair())       ||
+//      (trigDat->isElTrack())      ||
+//      (trigDat->isRadTau())       ||
+//      (trigDat->isBarrelBhabha())  )
+//   { l1Trigger_Sel = 1; }
+
+////////////////////////////////////////////////////////////////////////////
+// Software Trigger (L3 & L4)
+////////////////////////////////////////////////////////////////////////////
+      FAItem<Level4Decision > decision;
+      extract(iFrame.record(Stream::kEvent), decision );
+
+      switch( decision->decision() )
+      {
+         case Level4Decision::kKeepLevel3Garbage :
+         {
+            L4Decision = 1.;
+            break;
+         }
+         case Level4Decision::kLevel3AutoAccept :
+         {
+            L4Decision = 2.;
+            break;
+         }
+         case Level4Decision::kLevel4Keep :
+         {
+            L4Decision = 3.;
+            break;
+         }
+      }
+
+      if( (!L1Trigger) || (!L4Decision) )
+         return ActionBase::kFailed;
+//   }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+   FATable< NavShower > showerTable;
+   extract( iFrame.record( Stream::kEvent ) , showerTable, "GoodThings" );
+
+   if(showerTable.size()==0)
+      return ActionBase::kFailed;
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+
+   E = showerBegin->attributes().energy();
+   Theta = showerBegin->attributes().theta();
+   Phi = showerBegin->attributes().phi();
+   E925 = showerBegin->attributes().x925();
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+   // Extract total 4-momentum to get CM energy
+   FAItem< LabNet4Momentum > labMomentum ;
+   extract( iFrame.record( Stream::kStartRun ), labMomentum ) ;
+
+   LABPE= (*labMomentum).e();
+   LABPX= (*labMomentum).px();
+   LABPY= (*labMomentum).py();
+   LABPZ= (*labMomentum).pz();
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+   FATable< NavTrack > trackTable;
+   extract( iFrame.record( Stream::kEvent ) , trackTable, "GoodThings"  );
+
+   if( trackTable.size() == 0)
+      return ActionBase::kFailed;
+
+   FATable< NavTrack >::const_iterator trackBegin = trackTable.begin();
+   FATable< NavTrack >::const_iterator trackEnd = trackTable.end();
+
+   FAItem<TDKinematicFit> pi1 = (*trackBegin).pionFit();
+   FAItem<TDKinematicFit> mu1 = (*trackBegin).muonFit();
+   FAItem<TDKinematicFit> k1 = (*trackBegin).kaonFit();
+   FAItem<DedxInfo> the_dedx1 = (*trackBegin).dedxInfo();
+   FAItem<NavRich> the_rich1 = (*trackBegin).richInfo();
+   double cos_theta1 = pi1->pz() / pi1->pmag();
+   double cos_theta2 = mu1->pz() / mu1->pmag();
+   double cos_theta3 = k1->pz() / k1->pmag();
+
+   if(trackBegin->trackShowerMatch().valid())
+     ME1 = trackBegin->trackShowerMatch()->matchedEnergy();
+
+   MUDEPTH1 = trackBegin->muonId().depth();
+   EOP1 = trackBegin->elecId().eOverP();
+
+   if( trackTable.size() == 1){
+     N1TRACK = 1;
+
+     if(pi1.valid()){
+       PIPE0=pi1->lorentzMomentum().e();
+       PIPX0=pi1->px();
+       PIPY0=pi1->py();
+       PIPZ0=pi1->pz();
+       CHARGEPI0=pi1->charge();
+
+       if(the_dedx1.valid())
+         PISIGMA1=the_dedx1->piSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta1) < 0.8) && (the_rich1->pionHypWasAnalyzed())) {
+         PILL1=the_rich1->pionLogLikelihood();
+       }
+
+       FitEvt pipi( "Pipi", FitEvt::k_MissingMass,0,0.13957018 );
+       pipi.newPhoton(*showerBegin);
+       pipi.newTrack(*pi1);
+       pipi.doTheFit();
+
+       if( (pipi.chisqVtx()>0) && (pipi.chisqFit()>0) ) {
+           PIN1TAG = 1;
+           CHISQVTXPI0 = pipi.chisqVtx();
+           CHISQFITPI0 = pipi.chisqFit();
+           PIPE1 = LABPE - PIPE0 - E;
+           PIPX1 = LABPX - PIPX0 - E*sin(Theta)*cos(Phi);
+           PIPY1 = LABPY - PIPY0 - E*sin(Theta)*sin(Phi);
+           PIPZ1 = LABPZ - PIPZ0 - E*cos(Theta);
+           CHARGEPI1 = -CHARGEPI0;
+       }
+     }
+
+     if(mu1.valid()){
+       MUPE0=mu1->lorentzMomentum().e();
+       MUPX0=mu1->px();
+       MUPY0=mu1->py();
+       MUPZ0=mu1->pz();
+       CHARGEMU0=mu1->charge();
+   
+       if(the_dedx1.valid())
+         MUSIGMA1=the_dedx1->muSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta2) < 0.8) && (the_rich1->muonHypWasAnalyzed())) {
+         MULL1=the_rich1->muonLogLikelihood();
+       }
+
+       FitEvt mumu( "Mumu", FitEvt::k_MissingMass,0,0.105658367 );
+       mumu.newPhoton(*showerBegin);
+       mumu.newTrack(*mu1);
+       mumu.doTheFit();
+
+       if( (mumu.chisqVtx()>0) && (mumu.chisqFit()>0) ) {
+           MUN1TAG = 1;
+           CHISQVTXMU0 = mumu.chisqVtx();
+           CHISQFITMU0 = mumu.chisqFit();
+           MUPE1 = LABPE - MUPE0 - E;
+           MUPX1 = LABPX - MUPX0 - E*sin(Theta)*cos(Phi);
+           MUPY1 = LABPY - MUPY0 - E*sin(Theta)*sin(Phi);
+           MUPZ1 = LABPZ - MUPZ0 - E*cos(Theta);
+           CHARGEMU1 = -CHARGEMU0;
+       }
+     }
+
+     if(k1.valid()){
+       KPE0=k1->lorentzMomentum().e();
+       KPX0=k1->px();
+       KPY0=k1->py();
+       KPZ0=k1->pz();
+       CHARGEK0=k1->charge();
+
+       if(the_dedx1.valid())
+         KSIGMA1=the_dedx1->kSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta3) < 0.8) && (the_rich1->kaonHypWasAnalyzed())) {
+         KLL1=the_rich1->kaonLogLikelihood();
+       }
+
+       FitEvt kk( "Kk", FitEvt::k_MissingMass,0,0.493677 );
+       kk.newPhoton(*showerBegin);
+       kk.newTrack(*k1);
+       kk.doTheFit();
+
+       if( (kk.chisqVtx()>0) && (kk.chisqFit()>0) ) {
+           KN1TAG = 1;
+           CHISQVTXK0 = kk.chisqVtx();
+           CHISQFITK0 = kk.chisqFit();
+           KPE1 = LABPE - KPE0 - E;
+           KPX1 = LABPX - KPX0 - E*sin(Theta)*cos(Phi);
+           KPY1 = LABPY - KPY0 - E*sin(Theta)*sin(Phi);
+           KPZ1 = LABPZ - KPZ0 - E*cos(Theta);
+           CHARGEK1 = -CHARGEK0;
+       }
+     }
+
+   }
+
+   if( trackTable.size() == 2){
+     N2TRACK = 1;
+     FAItem<TDKinematicFit> pi2 = (*(trackBegin+1)).pionFit();
+     FAItem<DedxInfo> the_dedx2 = (*(trackBegin+1)).dedxInfo();
+     FAItem<TDKinematicFit> mu2 = (*(trackBegin+1)).muonFit();
+     FAItem<TDKinematicFit> k2 = (*(trackBegin+1)).kaonFit();
+     FAItem<NavRich> the_rich2 = (*(trackBegin+1)).richInfo();
+     double cos_theta11 = pi2->pz() / pi2->pmag();
+     double cos_theta22 = mu2->pz() / mu2->pmag();
+     double cos_theta33 = k2->pz() / k2->pmag();
+
+     if((trackBegin+1)->trackShowerMatch().valid())
+       ME2 = (trackBegin+1)->trackShowerMatch()->matchedEnergy();
+
+     MUDEPTH2 = (trackBegin+1)->muonId().depth();
+     EOP2 = (trackBegin+1)->elecId().eOverP();
+
+     if(pi1.valid()){
+       PIPE0=pi1->lorentzMomentum().e();
+       PIPX0=pi1->px();
+       PIPY0=pi1->py();
+       PIPZ0=pi1->pz();
+       CHARGEPI0=pi1->charge();
+
+       if(the_dedx1.valid())
+         PISIGMA1=the_dedx1->piSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta1) < 0.8) && (the_rich1->pionHypWasAnalyzed())) {
+         PILL1=the_rich1->pionLogLikelihood();
+       }
+
+       FitEvt pipi1( "Pipi1", FitEvt::k_MissingMass,0,0.13957018 );
+       pipi1.newPhoton(*showerBegin);
+       pipi1.newTrack(*pi1);
+       pipi1.doTheFit();
+
+       if( (pipi1.chisqVtx()>0) && (pipi1.chisqFit()>0) ) {
+           PIN1TAG1 = 1;
+           CHISQVTXPI1 = pipi1.chisqVtx();
+           CHISQFITPI1 = pipi1.chisqFit();
+           PIPE1 = LABPE - PIPE0 - E;
+           PIPX1 = LABPX - PIPX0 - E*sin(Theta)*cos(Phi);
+           PIPY1 = LABPY - PIPY0 - E*sin(Theta)*sin(Phi);
+           PIPZ1 = LABPZ - PIPZ0 - E*cos(Theta);
+           CHARGEPI1 = -CHARGEPI0;
+       }
+     }
+
+     if(mu1.valid()){
+       MUPE0=mu1->lorentzMomentum().e();
+       MUPX0=mu1->px();
+       MUPY0=mu1->py();
+       MUPZ0=mu1->pz();
+       CHARGEMU0=mu1->charge();
+
+       if(the_dedx1.valid())
+         MUSIGMA1=the_dedx1->muSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta2) < 0.8) && (the_rich1->muonHypWasAnalyzed())) {
+         MULL1=the_rich1->muonLogLikelihood();
+       }
+
+       FitEvt mumu1( "Mumu1", FitEvt::k_MissingMass,0,0.105658367 );
+       mumu1.newPhoton(*showerBegin);
+       mumu1.newTrack(*mu1);
+       mumu1.doTheFit();
+
+       if( (mumu1.chisqVtx()>0) && (mumu1.chisqFit()>0) ) {
+           MUN1TAG1 = 1;
+           CHISQVTXMU1 = mumu1.chisqVtx();
+           CHISQFITMU1 = mumu1.chisqFit();
+           MUPE1 = LABPE - MUPE0 - E;
+           MUPX1 = LABPX - MUPX0 - E*sin(Theta)*cos(Phi);
+           MUPY1 = LABPY - MUPY0 - E*sin(Theta)*sin(Phi);
+           MUPZ1 = LABPZ - MUPZ0 - E*cos(Theta);
+           CHARGEMU1 = -CHARGEMU0;
+       }
+     }
+
+     if(k1.valid()){
+       KPE0=k1->lorentzMomentum().e();
+       KPX0=k1->px();
+       KPY0=k1->py();
+       KPZ0=k1->pz();
+       CHARGEK0=k1->charge();
+
+       if(the_dedx1.valid())
+         KSIGMA1=the_dedx1->kSigma();
+
+       if ((the_rich1.valid()) && (fabs(cos_theta3) < 0.8) && (the_rich1->kaonHypWasAnalyzed())) {
+         KLL1=the_rich1->kaonLogLikelihood();
+       }
+
+       FitEvt kk1( "Kk1", FitEvt::k_MissingMass,0,0.493677 );
+       kk1.newPhoton(*showerBegin);
+       kk1.newTrack(*k1);
+       kk1.doTheFit();
+
+       if( (kk1.chisqVtx()>0) && (kk1.chisqFit()>0) ) {
+           KN1TAG1 = 1;
+           CHISQVTXK1 = kk1.chisqVtx();
+           CHISQFITK1 = kk1.chisqFit();
+           KPE1 = LABPE - KPE0 - E;
+           KPX1 = LABPX - KPX0 - E*sin(Theta)*cos(Phi);
+           KPY1 = LABPY - KPY0 - E*sin(Theta)*sin(Phi);
+           KPZ1 = LABPZ - KPZ0 - E*cos(Theta);
+           CHARGEK1 = -CHARGEK0;
+       }
+     }
+
+     if(pi2.valid()){
+       PIPE2=pi2->lorentzMomentum().e();
+       PIPX2=pi2->px();
+       PIPY2=pi2->py();
+       PIPZ2=pi2->pz();
+       CHARGEPI2=pi2->charge();
+
+       if(the_dedx2.valid())
+         PISIGMA2=the_dedx2->piSigma();
+
+       if ((the_rich2.valid()) && (fabs(cos_theta11) < 0.8) && (the_rich2->pionHypWasAnalyzed())) {
+         PILL2=the_rich2->pionLogLikelihood();
+       }
+
+       FitEvt pipi2( "Pipi2", FitEvt::k_MissingMass,0,0.13957018 );
+       pipi2.newPhoton(*showerBegin);
+       pipi2.newTrack(*pi2);
+       pipi2.doTheFit();
+
+       if( (pipi2.chisqVtx()>0) && (pipi2.chisqFit()>0) ) {
+           PIN1TAG2 = 1;
+           CHISQVTXPI2 = pipi2.chisqVtx();
+           CHISQFITPI2 = pipi2.chisqFit();
+           PIPE3 = LABPE - PIPE2 - E;
+           PIPX3 = LABPX - PIPX2 - E*sin(Theta)*cos(Phi);
+           PIPY3 = LABPY - PIPY2 - E*sin(Theta)*sin(Phi);
+           PIPZ3 = LABPZ - PIPZ2 - E*cos(Theta);
+           CHARGEPI3 = -CHARGEPI2;
+       }
+     }
+
+     if(mu2.valid()){
+       MUPE2=mu2->lorentzMomentum().e();
+       MUPX2=mu2->px();
+       MUPY2=mu2->py();
+       MUPZ2=mu2->pz();
+       CHARGEMU2=mu2->charge();
+
+       if(the_dedx2.valid())
+         MUSIGMA2=the_dedx2->muSigma();
+
+       if ((the_rich2.valid()) && (fabs(cos_theta22) < 0.8) && (the_rich2->muonHypWasAnalyzed())) {
+         MULL2=the_rich2->muonLogLikelihood();
+       }
+
+       FitEvt mumu2( "Mumu2", FitEvt::k_MissingMass,0,0.105658367 );
+       mumu2.newPhoton(*showerBegin);
+       mumu2.newTrack(*mu2);
+       mumu2.doTheFit();
+
+       if( (mumu2.chisqVtx()>0) && (mumu2.chisqFit()>0) ) {
+           MUN1TAG2 = 1;
+           CHISQVTXMU2 = mumu2.chisqVtx();
+           CHISQFITMU2 = mumu2.chisqFit();
+           MUPE3 = LABPE - MUPE2 - E;
+           MUPX3 = LABPX - MUPX2 - E*sin(Theta)*cos(Phi);
+           MUPY3 = LABPY - MUPY2 - E*sin(Theta)*sin(Phi);
+           MUPZ3 = LABPZ - MUPZ2 - E*cos(Theta);
+           CHARGEMU3 = -CHARGEMU2;
+       }
+     }
+
+     if(k2.valid()){
+       KPE2=k2->lorentzMomentum().e();
+       KPX2=k2->px();
+       KPY2=k2->py();
+       KPZ2=k2->pz();
+       CHARGEK2=k2->charge();
+
+       if(the_dedx2.valid())
+         KSIGMA2=the_dedx2->kSigma();
+
+       if ((the_rich2.valid()) && (fabs(cos_theta33) < 0.8) && (the_rich2->kaonHypWasAnalyzed())) {
+         KLL2=the_rich2->kaonLogLikelihood();
+       }
+
+       FitEvt kk2( "Kk2", FitEvt::k_MissingMass,0,0.493677 );
+       kk2.newPhoton(*showerBegin);
+       kk2.newTrack(*k2);
+       kk2.doTheFit();
+
+       if( (kk2.chisqVtx()>0) && (kk2.chisqFit()>0) ) {
+           KN1TAG2 = 1;
+           CHISQVTXK2 = kk2.chisqVtx();
+           CHISQFITK2 = kk2.chisqFit();
+           KPE3 = LABPE - KPE2 - E;
+           KPX3 = LABPX - KPX2 - E*sin(Theta)*cos(Phi);
+           KPY3 = LABPY - KPY2 - E*sin(Theta)*sin(Phi);
+           KPZ3 = LABPZ - KPZ2 - E*cos(Theta);
+           CHARGEK3 = -CHARGEK2;
+       }
+     }
+
+     if(PIN1TAG1) {
+        COSTHPIPI1 = (PIPX1*PIPX2+PIPY1*PIPY2+PIPZ1*PIPZ2)/(sqrt(pow(PIPX1,2)+pow(PIPY1,2)+pow(PIPZ1,2))*sqrt(pow(PIPX2,2)+pow(PIPY2,2)+pow(PIPZ2,2)));
+        COSTHPIMU1 = (PIPX1*MUPX2+PIPY1*MUPY2+PIPZ1*MUPZ2)/(sqrt(pow(PIPX1,2)+pow(PIPY1,2)+pow(PIPZ1,2))*sqrt(pow(MUPX2,2)+pow(MUPY2,2)+pow(MUPZ2,2)));
+        COSTHPIK1 = (PIPX1*KPX2+PIPY1*KPY2+PIPZ1*KPZ2)/(sqrt(pow(PIPX1,2)+pow(PIPY1,2)+pow(PIPZ1,2))*sqrt(pow(KPX2,2)+pow(KPY2,2)+pow(KPZ2,2)));
+        if((COSTHPIPI1 > 0.8) && (CHARGEPI1 == CHARGEPI2))
+          PIN2PROBE1 = 1;
+        else if((COSTHPIMU1 > 0.8) && (CHARGEPI1 == CHARGEMU2))
+          PIN2PROBE1 = 1;
+        else if((COSTHPIK1 > 0.8) && (CHARGEPI1 == CHARGEK2))
+          PIN2PROBE1 = 1;
+     }
+
+     if(MUN1TAG1) {
+        COSTHMUPI1 = (MUPX1*PIPX2+MUPY1*PIPY2+MUPZ1*PIPZ2)/(sqrt(pow(MUPX1,2)+pow(MUPY1,2)+pow(MUPZ1,2))*sqrt(pow(PIPX2,2)+pow(PIPY2,2)+pow(PIPZ2,2)));
+        COSTHMUMU1 = (MUPX1*MUPX2+MUPY1*MUPY2+MUPZ1*MUPZ2)/(sqrt(pow(MUPX1,2)+pow(MUPY1,2)+pow(MUPZ1,2))*sqrt(pow(MUPX2,2)+pow(MUPY2,2)+pow(MUPZ2,2)));
+        COSTHMUK1 = (MUPX1*KPX2+MUPY1*KPY2+MUPZ1*KPZ2)/(sqrt(pow(MUPX1,2)+pow(MUPY1,2)+pow(MUPZ1,2))*sqrt(pow(KPX2,2)+pow(KPY2,2)+pow(KPZ2,2)));
+        if((COSTHMUPI1 > 0.8) && (CHARGEMU1 == CHARGEPI2))
+          MUN2PROBE1 = 1;
+        else if((COSTHMUMU1 > 0.8) && (CHARGEMU1 == CHARGEMU2))
+          MUN2PROBE1 = 1;
+        else if((COSTHMUK1 > 0.8) && (CHARGEMU1 == CHARGEK2))
+          MUN2PROBE1 = 1;
+     }
+
+     if(KN1TAG1) {
+        COSTHKPI1 = (KPX1*KPX2+KPY1*PIPY2+PIPZ1*PIPZ2)/(sqrt(pow(KPX1,2)+pow(KPY1,2)+pow(KPZ1,2))*sqrt(pow(PIPX2,2)+pow(PIPY2,2)+pow(PIPZ2,2)));
+        COSTHKMU1 = (KPX1*MUPX2+KPY1*MUPY2+KPZ1*MUPZ2)/(sqrt(pow(KPX1,2)+pow(KPY1,2)+pow(KPZ1,2))*sqrt(pow(MUPX2,2)+pow(MUPY2,2)+pow(MUPZ2,2)));
+        COSTHKK1 = (KPX1*KPX2+KPY1*KPY2+KPZ1*KPZ2)/(sqrt(pow(KPX1,2)+pow(KPY1,2)+pow(KPZ1,2))*sqrt(pow(KPX2,2)+pow(KPY2,2)+pow(KPZ2,2)));
+        if((COSTHKPI1 > 0.8) && (CHARGEK1 == CHARGEPI2))
+          KN2PROBE1 = 1;
+        else if((COSTHKMU1 > 0.8) && (CHARGEK1 == CHARGEMU2))
+          KN2PROBE1 = 1;
+        else if((COSTHKK1 > 0.8) && (CHARGEK1 == CHARGEK2))
+          KN2PROBE1 = 1;
+     }
+
+
+     if(PIN1TAG2) {
+        COSTHPIPI2 = (PIPX3*PIPX0+PIPY3*PIPY0+PIPZ3*PIPZ0)/(sqrt(pow(PIPX3,2)+pow(PIPY3,2)+pow(PIPZ3,2))*sqrt(pow(PIPX0,2)+pow(PIPY0,2)+pow(PIPZ0,2)));
+        COSTHPIMU2 = (PIPX3*MUPX0+PIPY3*MUPY0+PIPZ3*MUPZ0)/(sqrt(pow(PIPX3,2)+pow(PIPY3,2)+pow(PIPZ3,2))*sqrt(pow(MUPX0,2)+pow(MUPY0,2)+pow(MUPZ0,2)));
+        COSTHPIK2 = (PIPX3*KPX0+PIPY3*KPY0+PIPZ3*KPZ0)/(sqrt(pow(PIPX3,2)+pow(PIPY3,2)+pow(PIPZ3,2))*sqrt(pow(KPX0,2)+pow(KPY0,2)+pow(KPZ0,2)));
+        if((COSTHPIPI2 > 0.8) && (CHARGEPI3 == CHARGEPI0))
+          PIN2PROBE2 = 1;
+        else if((COSTHPIMU2 > 0.8) && (CHARGEPI3 == CHARGEMU0))
+          PIN2PROBE2 = 1;
+        else if((COSTHPIK2 > 0.8) && (CHARGEPI3 == CHARGEK0))
+          PIN2PROBE2 = 1;
+     }
+
+     if(MUN1TAG2) {
+        COSTHMUPI2 = (MUPX3*PIPX0+MUPY3*PIPY0+MUPZ3*PIPZ0)/(sqrt(pow(MUPX3,2)+pow(MUPY3,2)+pow(MUPZ3,2))*sqrt(pow(PIPX0,2)+pow(PIPY0,2)+pow(PIPZ0,2)));
+        COSTHMUMU2 = (MUPX3*MUPX0+MUPY3*MUPY0+MUPZ3*MUPZ0)/(sqrt(pow(MUPX3,2)+pow(MUPY3,2)+pow(MUPZ3,2))*sqrt(pow(MUPX0,2)+pow(MUPY0,2)+pow(MUPZ0,2)));
+        COSTHMUK2 = (MUPX3*KPX0+MUPY3*KPY0+MUPZ3*KPZ0)/(sqrt(pow(MUPX3,2)+pow(MUPY3,2)+pow(MUPZ3,2))*sqrt(pow(KPX0,2)+pow(KPY0,2)+pow(KPZ0,2)));
+        if((COSTHMUPI2 > 0.8) && (CHARGEMU3 == CHARGEPI0))
+          MUN2PROBE2 = 1;
+        else if((COSTHMUMU2 > 0.8) && (CHARGEMU3 == CHARGEMU0))
+          MUN2PROBE2 = 1;
+        else if((COSTHMUK2 > 0.8) && (CHARGEMU3 == CHARGEK0))
+          MUN2PROBE2 = 1;
+     }
+
+     if(KN1TAG2) {
+        COSTHKPI2 = (KPX3*KPX0+KPY3*PIPY0+PIPZ3*PIPZ0)/(sqrt(pow(KPX3,2)+pow(KPY3,2)+pow(KPZ3,2))*sqrt(pow(PIPX0,2)+pow(PIPY0,2)+pow(PIPZ0,2)));
+        COSTHKMU2 = (KPX3*MUPX0+KPY3*MUPY0+KPZ3*MUPZ0)/(sqrt(pow(KPX3,2)+pow(KPY3,2)+pow(KPZ3,2))*sqrt(pow(MUPX0,2)+pow(MUPY0,2)+pow(MUPZ0,2)));
+        COSTHKK2 = (KPX3*KPX0+KPY3*KPY0+KPZ3*KPZ0)/(sqrt(pow(KPX3,2)+pow(KPY3,2)+pow(KPZ3,2))*sqrt(pow(KPX0,2)+pow(KPY0,2)+pow(KPZ0,2)));
+        if((COSTHKPI2 > 0.8) && (CHARGEK3 == CHARGEPI0))
+          KN2PROBE2 = 1;
+        else if((COSTHKMU2 > 0.8) && (CHARGEK3 == CHARGEMU0))
+          KN2PROBE2 = 1;
+        else if((COSTHKK2 > 0.8) && (CHARGEK3 == CHARGEK0))
+          KN2PROBE2 = 1;
+     }
+
+
+
+
+
+
+     if(PIN1TAG1 && PIN1TAG2) {
+        PIN2TAG = 1;
+     }
+
+     if(MUN1TAG1 && MUN1TAG2) {
+        MUN2TAG = 1;
+     }
+
+     if(KN1TAG1 && KN1TAG2) {
+        KN2TAG = 1;
+     }
+   }
+
+
+   tuple[e] = E;
+   tuple[th] = Theta;
+   tuple[phi] = Phi;
+   tuple[e925] = E925;
+   tuple[n1track] = N1TRACK;
+   tuple[n2track] = N2TRACK;
+   tuple[charge1] =CHARGEPI0;
+   tuple[charge2] =CHARGEPI2;
+   tuple[pin1tag] = PIN1TAG;
+   tuple[pin1tag1] = PIN1TAG1;
+   tuple[pin1tag2] = PIN1TAG2;
+   tuple[pin2tag] = PIN2TAG;
+   tuple[pin2probe1] = PIN2PROBE1;
+   tuple[pin2probe2] = PIN2PROBE2;
+
+   tuple[mun1tag] = MUN1TAG;
+   tuple[mun1tag1] = MUN1TAG1;
+   tuple[mun1tag2] = MUN1TAG2;
+   tuple[mun2tag] = MUN2TAG;
+   tuple[mun2probe1] = MUN2PROBE1;
+   tuple[mun2probe2] = MUN2PROBE2;
+
+   tuple[kn1tag] = KN1TAG;
+   tuple[kn1tag1] = KN1TAG1;
+   tuple[kn1tag2] = KN1TAG2;
+   tuple[kn2tag] = KN2TAG;
+   tuple[kn2probe1] = KN2PROBE1;
+   tuple[kn2probe2] = KN2PROBE2;
+
+   tuple[pite0] = PIPE0;
+   tuple[pipx0] = PIPX0;
+   tuple[pipy0] = PIPY0;
+   tuple[pipz0] = PIPZ0;
+   tuple[pite1] = PIPE1;
+   tuple[pipx1] = PIPX1;
+   tuple[pipy1] = PIPY1;
+   tuple[pipz1] = PIPZ1;
+   tuple[pite2] = PIPE2;
+   tuple[pipx2] = PIPX2;
+   tuple[pipy2] = PIPY2;
+   tuple[pipz2] = PIPZ2;
+   tuple[pite3] = PIPE3;
+   tuple[pipx3] = PIPX3;
+   tuple[pipy3] = PIPY3;
+   tuple[pipz3] = PIPZ3;
+
+   tuple[mute0] = MUPE0;
+   tuple[mupx0] = MUPX0;
+   tuple[mupy0] = MUPY0;
+   tuple[mupz0] = MUPZ0;
+   tuple[mute1] = MUPE1;
+   tuple[mupx1] = MUPX1;
+   tuple[mupy1] = MUPY1;
+   tuple[mupz1] = MUPZ1;
+   tuple[mute2] = MUPE2;
+   tuple[mupx2] = MUPX2;
+   tuple[mupy2] = MUPY2;
+   tuple[mupz2] = MUPZ2;
+   tuple[mute3] = MUPE3;
+   tuple[mupx3] = MUPX3;
+   tuple[mupy3] = MUPY3;
+   tuple[mupz3] = MUPZ3;
+
+   tuple[kte0] = KPE0;
+   tuple[kpx0] = KPX0;
+   tuple[kpy0] = KPY0;
+   tuple[kpz0] = KPZ0;
+   tuple[kte1] = KPE1;
+   tuple[kpx1] = KPX1;
+   tuple[kpy1] = KPY1;
+   tuple[kpz1] = KPZ1;
+   tuple[kte2] = KPE2;
+   tuple[kpx2] = KPX2;
+   tuple[kpy2] = KPY2;
+   tuple[kpz2] = KPZ2;
+   tuple[kte3] = KPE3;
+   tuple[kpx3] = KPX3;
+   tuple[kpy3] = KPY3;
+   tuple[kpz3] = KPZ3;
+
+   tuple[pisigma1] = PISIGMA1;
+   tuple[pisigma2] = PISIGMA2;
+   tuple[musigma1] = MUSIGMA1;
+   tuple[musigma2] = MUSIGMA2;
+   tuple[ksigma1] = KSIGMA1;
+   tuple[ksigma2] = KSIGMA2;
+
+   tuple[pill1] = PILL1;
+   tuple[pill2] = PILL2;
+   tuple[mull1] = MULL1;
+   tuple[mull2] = MULL2;
+   tuple[kll1] = KLL1;
+   tuple[kll2] = KLL2;
+
+   tuple[costhpi1] = COSTHPIPI1;
+   tuple[costhpi2] = COSTHPIPI2;
+   tuple[costhmu1] = COSTHMUMU1;
+   tuple[costhmu2] = COSTHMUMU2;
+   tuple[costhk1] = COSTHKK1;
+   tuple[costhk2] = COSTHKK2;
+
+   tuple[eop1] = EOP1;
+   tuple[eop2] = EOP2;
+   tuple[me1] = ME1;
+   tuple[me2] = ME2;
+   tuple[mudepth1] = MUDEPTH1;
+   tuple[mudepth2] = MUDEPTH2;
+
+   tuple[chisqvtxpi0] = CHISQVTXPI0;
+   tuple[chisqfitpi0] = CHISQFITPI0;
+   tuple[chisqvtxpi1] = CHISQVTXPI1;
+   tuple[chisqfitpi1] = CHISQFITPI1;
+   tuple[chisqvtxpi2] = CHISQVTXPI2;
+   tuple[chisqfitpi2] = CHISQFITPI2;
+   tuple[chisqvtxmu0] = CHISQVTXMU0;
+   tuple[chisqfitmu0] = CHISQFITMU0;
+   tuple[chisqvtxmu1] = CHISQVTXMU1;
+   tuple[chisqfitmu1] = CHISQFITMU1;
+   tuple[chisqvtxmu2] = CHISQVTXMU2;
+   tuple[chisqfitmu2] = CHISQFITMU2;
+   tuple[chisqvtxk0] = CHISQVTXK0;
+   tuple[chisqfitk0] = CHISQFITK0;
+   tuple[chisqvtxk1] = CHISQVTXK1;
+   tuple[chisqfitk1] = CHISQFITK1;
+   tuple[chisqvtxk2] = CHISQVTXK2;
+   tuple[chisqfitk2] = CHISQFITK2;
+
+   tuple[l1trigger1] = L1TRIGGER1;
+   tuple[l1trigger2] = L1TRIGGER2;
+   tuple[l1trigger3] = L1TRIGGER3;
+   tuple[l1trigger4] = L1TRIGGER4;
+   tuple[l1trigger5] = L1TRIGGER5;
+   tuple[l1trigger6] = L1TRIGGER6;
+   tuple[l1trigger7] = L1TRIGGER7;
+   tuple[l1trigger8] = L1TRIGGER8;
+   tuple[l1trigger9] = L1TRIGGER9;
+   tuple[l1trigger10] = L1TRIGGER10;
+   tuple[l1trigger11] = L1TRIGGER11;
+   tuple[l1trigger12] = L1TRIGGER12;
+   tuple[l1trigger13] = L1TRIGGER13;
+   tuple[l1trigger14] = L1TRIGGER14;
+   tuple[l1trigger15] = L1TRIGGER15;
+   tuple[l1trigger16] = L1TRIGGER16;
+
+
+   (*m_showerTuple).fill(tuple);
+
+   return ActionBase::kPassed;
+}
+
+
+ActionBase::ActionResult
+TrEffProc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   FAItem< MagneticField > cleoBField;
+   extract( iFrame.record( Stream::kBeginRun ), cleoBField );
+
+   FitEvtSettings &settings(FitEvtSettings::instance());
+   settings.setField(*cleoBField);
+   settings.setBeamSpot(*spot);
+   settings.setLorVecCM( beam_energy->value() );
+//   settings.setVerbose();
+
+   return ActionBase::kPassed;
+}
+
+
+/*
+ActionBase::ActionResult
+TrEffProc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

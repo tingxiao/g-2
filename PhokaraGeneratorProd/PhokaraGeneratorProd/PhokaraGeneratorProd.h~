@@ -1,0 +1,102 @@
+// -*- C++ -*-
+#if !defined(PHOKARAGENERATORPROD_PHOKARAGENERATORPROD_H)
+#define PHOKARAGENERATORPROD_PHOKARAGENERATORPROD_H
+//
+// Package:     <PhokaraGeneratorProd>
+// Module:      PhokaraGeneratorProd
+//
+/**\class PhokaraGeneratorProd PhokaraGeneratorProd.h PhokaraGeneratorProd/PhokaraGeneratorProd.h
+ 
+ Description: <one line class summary>
+
+ Usage:
+    <usage>
+
+*/
+
+// system include files
+
+// user include files
+#include "Processor/Producer.h"
+#include "HistogramInterface/HistogramPackage.h"
+#include "CommandPattern/Menu.h"
+#include "CommandPattern/Parameter.h"
+//#include "CommandPattern/Menu.h"
+
+// forward declarations
+
+class PhokaraGeneratorProd : public Producer
+{
+      // ------------ friend classses and functions ---------------
+
+   public:
+      // ------------ constants, enums and typedefs ---------------
+
+      // ------------ Constructors and destructor -----------------
+      PhokaraGeneratorProd( void );                      // anal1 
+      virtual ~PhokaraGeneratorProd();                   // anal5 
+
+      // ------------ member functions ----------------------------
+
+      // methods for beginning/end "Interactive"
+      virtual void init( void );             // anal1 "Interactive"
+      virtual void terminate( void );        // anal5 "Interactive"
+
+      // standard place for booking histograms
+      virtual void hist_book( HIHistoManager& );                  
+
+      // ------------ const member functions ----------------------
+
+//    generator mode
+      const string& getMode() const 
+      { return m_mode.value() ; } 
+//    minimum angle
+      const double& getMinimumAngle() const 
+      { return m_minimumAngle.value() ; }
+//    maximum angle
+      const double& getMaximumAngle() const 
+      { return m_maximumAngle.value() ; }
+//    minimum energy of outgoing particle
+      const double& getMinimumEnergy() const
+      { return m_minimumEnergy.value() ; }
+//    maximum acollinarity
+      const double& getMaximumAcollinarity() const
+      { return m_maximumAcollinarity.value() ; }
+
+
+      // ------------ static member functions ---------------------
+
+   protected:
+      // ------------ protected member functions ------------------
+
+      // ------------ protected const member functions ------------
+
+   private:
+      // ------------ Constructors and destructor -----------------
+      PhokaraGeneratorProd( const PhokaraGeneratorProd& );
+
+      // ------------ assignment operator(s) ----------------------
+      const PhokaraGeneratorProd& operator=( const PhokaraGeneratorProd& );
+
+      // ------------ private member functions --------------------
+
+      ProxyBase* makeMyProxy() ;
+
+      // ------------ private const member functions --------------
+
+      // ------------ data members --------------------------------
+
+      Menu              m_Menu;
+      Parameter<string> m_mode ;  
+      Parameter<double> m_minimumAngle;           // degree
+      Parameter<double> m_maximumAngle;           // degree
+      Parameter<double> m_minimumEnergy;          // GeV
+      Parameter<double> m_maximumAcollinarity;    // degree
+
+      // ------------ static data members -------------------------
+
+};
+
+// inline function definitions
+
+#endif /* PHOKARAGENERATORPROD_PHOKARAGENERATORPROD_H */

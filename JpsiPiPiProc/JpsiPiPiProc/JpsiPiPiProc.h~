@@ -1,0 +1,174 @@
+// -*- C++ -*-
+#if !defined(PPGPSIPPROC_PPGPSIPPROC_H)
+#define PPGPSIPPROC_PPGPSIPPROC_H
+//
+// Package:     <JpsiPiPiProc>
+// Module:      JpsiPiPiProc
+//
+/**\class JpsiPiPiProc JpsiPiPiProc.h JpsiPiPiProc/JpsiPiPiProc.h
+ 
+ Description: <one line class summary>
+
+ Usage:
+    <usage>
+
+*/
+//
+// Author:      Sean Dobbs
+// Created:     Wed Jul  7 17:32:00 EDT 2004
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+// system include files
+
+// user include files
+#include "Processor/Processor.h"
+#include "HistogramInterface/HistogramPackage.h"
+#include "FrameAccess/FATable.h"
+#include "Navigation/NavTrack.h"
+#include "Navigation/NavShower.h"
+
+// forward declarations
+
+class JpsiPiPiProc : public Processor
+{
+      // ------------ friend classes and functions --------------
+
+   public:
+      // ------------ constants, enums and typedefs --------------
+
+      // ------------ Constructors and destructor ----------------
+      JpsiPiPiProc( void );                      // anal1 
+      virtual ~JpsiPiPiProc();                   // anal5 
+
+      // ------------ member functions ---------------------------
+
+      // methods for beginning/end "Interactive"
+      virtual void init( void );             // anal1 "Interactive"
+      virtual void terminate( void );        // anal5 "Interactive"
+
+      // standard place for booking histograms
+      virtual void hist_book( HIHistoManager& );                  
+
+      // methods for binding to streams (anal2-4 etc.)
+      virtual ActionBase::ActionResult event( Frame& iFrame );
+      virtual ActionBase::ActionResult beginRun( Frame& iFrame);
+      //virtual ActionBase::ActionResult endRun( Frame& iFrame);
+
+      // ------------ const member functions ---------------------
+
+      // ------------ static member functions --------------------
+
+   protected:
+      // ------------ protected member functions -----------------
+      double cangTrackShower(const NavShower &aShower,
+			     const NavTrack &aTrack  );
+      double calcDOCA( double iD,  double iPhi );
+
+      // ------------ protected const member functions -----------
+
+   private:
+      // ------------ Constructors and destructor ----------------
+      JpsiPiPiProc( const JpsiPiPiProc& );
+
+      // ------------ assignment operator(s) ---------------------
+      const JpsiPiPiProc& operator=( const JpsiPiPiProc& );
+
+      // ------------ private member functions -------------------
+      void bind( 
+         ActionBase::ActionResult (JpsiPiPiProc::*iMethod)( Frame& ),
+	      const Stream::Type& iStream );
+
+      // ------------ private const member functions -------------
+
+      // ------------ data members -------------------------------
+	double m_beam_x;  // beamspot location
+	double m_beam_y;
+	double m_beam_z;
+	
+	HINtuple *m_LEGammaNt;
+
+	//HIHist1D *h_mjpsi;
+
+	HIHist1D *h_pion_p;
+	HIHist1D *h_kaon_p;
+	HIHist1D *h_proton_p;
+
+
+	HIHist1D *h_pion_matche;
+	HIHist1D *h_pion_matche1;
+	HIHist1D *h_pion_matche2;
+	HIHist1D *h_pion_matche3;
+	HIHist1D *h_pion_matche4;
+	HIHist1D *h_pion_matche5;
+	HIHist1D *h_pion_matche6;
+	HIHist1D *h_pion_matche7;
+	HIHist1D *h_pion_matche8;
+	HIHist1D *h_pion_matche9;
+	HIHist1D *h_pion_matche10;
+	HIHist1D *h_pion_matche11;
+	HIHist1D *h_pion_matche12;
+	HIHist1D *h_pion_matche13;
+	HIHist1D *h_pion_matche14;
+	HIHist1D *h_pion_matche15;
+	HIHist1D *h_pion_matche16;
+	HIHist1D *h_pion_matche17;
+	HIHist1D *h_pion_matche18;
+	HIHist1D *h_pion_matche19;
+	HIHist1D *h_pion_matche20;
+
+	HIHist1D *h_kaon_matche;
+	HIHist1D *h_kaon_matche1;
+	HIHist1D *h_kaon_matche2;
+	HIHist1D *h_kaon_matche3;
+	HIHist1D *h_kaon_matche4;
+	HIHist1D *h_kaon_matche5;
+	HIHist1D *h_kaon_matche6;
+	HIHist1D *h_kaon_matche7;
+	HIHist1D *h_kaon_matche8;
+	HIHist1D *h_kaon_matche9;
+	HIHist1D *h_kaon_matche10;
+	HIHist1D *h_kaon_matche11;
+	HIHist1D *h_kaon_matche12;
+	HIHist1D *h_kaon_matche13;
+	HIHist1D *h_kaon_matche14;
+	HIHist1D *h_kaon_matche15;
+	HIHist1D *h_kaon_matche16;
+	HIHist1D *h_kaon_matche17;
+	HIHist1D *h_kaon_matche18;
+	HIHist1D *h_kaon_matche19;
+	HIHist1D *h_kaon_matche20;
+
+	HIHist1D *h_proton_matche;
+	HIHist1D *h_proton_matche1;
+	HIHist1D *h_proton_matche2;
+	HIHist1D *h_proton_matche3;
+	HIHist1D *h_proton_matche4;
+	HIHist1D *h_proton_matche5;
+	HIHist1D *h_proton_matche6;
+	HIHist1D *h_proton_matche7;
+	HIHist1D *h_proton_matche8;
+	HIHist1D *h_proton_matche9;
+	HIHist1D *h_proton_matche10;
+	HIHist1D *h_proton_matche11;
+	HIHist1D *h_proton_matche12;
+	HIHist1D *h_proton_matche13;
+	HIHist1D *h_proton_matche14;
+	HIHist1D *h_proton_matche15;
+	HIHist1D *h_proton_matche16;
+	HIHist1D *h_proton_matche17;
+	HIHist1D *h_proton_matche18;
+	HIHist1D *h_proton_matche19;
+	HIHist1D *h_proton_matche20;
+
+      // ------------ static data members ------------------------
+
+};
+
+// inline function definitions
+
+#endif /* PPGPSIPPROC_PPGPSIPPROC_H */

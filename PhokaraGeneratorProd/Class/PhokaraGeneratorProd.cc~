@@ -1,0 +1,172 @@
+// -*- C++ -*-
+//
+// Package:     <PhokaraGeneratorProd>
+// Module:      PhokaraGeneratorProd
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+
+
+#include "Experiment/Experiment.h"
+#include "Experiment/fortran_types.h"
+
+
+// system include files
+
+// user include files
+#include "PhokaraGeneratorProd/PhokaraGeneratorProd.h"
+#include "PhokaraGeneratorProd/PhokaraDecayTreeProxy.h"
+#include "Experiment/report.h"
+
+#include "DataHandler/RecordMethods.h"
+#include "DataHandler/ProxyFactory.h"
+#include "DataHandler/ProxyFactoryFunction.h"
+
+// STL classes
+// You may have to uncomment some of these or other stl headers
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+#include <string>
+#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "PhokaraGeneratorProd.PhokaraGeneratorProd" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: PhokaraGeneratorProd.cc,v 1.4 2009/07/04 12:00:00 sdobbs Exp $";
+static const char* const kTagString = "$Name: v01_00_01 $";
+
+//
+// static data member definitions
+//
+
+//
+// constructors and destructor
+//
+
+// sdobbs, CHANGE THIS!
+PhokaraGeneratorProd::PhokaraGeneratorProd( void )               // anal1
+   : Producer( "PhokaraGeneratorProd" ) ,
+     m_Menu("PhokaraParameters", this),
+     m_mode ( "Mode" , &m_Menu,  "None" ),
+     m_minimumAngle("MinimumAngle" , &m_Menu , 20.0),
+     m_maximumAngle("MaximumAngle" , &m_Menu , 160.0),
+     m_minimumEnergy("MinimumEnergy" , &m_Menu , 0. ),
+     m_maximumAcollinarity("MaximumAcollinarity", &m_Menu , 360.0)     
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+   m_mode.setHelpString("Mode: Bhabha, MuPair, GamGam, or PiPair" ) ;
+   m_minimumAngle.setHelpString("MinimumAngle: minimum angle of outgoing "
+				"partice (should be in degree) \n");
+   m_maximumAngle.setHelpString("MaximumAngle: maximum angle of outgoing "
+				"partice (should be in degree) \n");
+   m_minimumEnergy.setHelpString("MinimumEnergy: minimum energy of outgoing "
+				"partice (should be in GeV) \n");
+   m_maximumAcollinarity.setHelpString("MaximumAcollinarity: maximum "
+				       "acollinarity of outgoing partices "
+				       " (should be in degree) \n");
+
+   registerProxyFactory( 
+      Stream::kEvent, 
+      new ProxyFactoryFunction< PhokaraGeneratorProd, PhokaraDecayTreeProxy >(
+	 *this, 
+	 &PhokaraGeneratorProd::makeMyProxy ),
+      UsageTag("Generator") );    // or UsageTag( "MyUsage" )
+}
+
+ProxyBase*
+PhokaraGeneratorProd::makeMyProxy()
+{ 
+   return new PhokaraDecayTreeProxy( this );
+}
+
+// Proxy Registration Step 2:
+// template instantiations for proxy factories
+#include "DataHandler/Template/ProxyFactoryFunction.cc"
+template class ProxyFactoryFunction< PhokaraGeneratorProd, PhokaraDecayTreeProxy >;
+
+// non-trivial proxyfactory producer method used above
+// (if you want to use it, don't forget to declare this method 
+//  in "producer.h"!)
+
+// PhokaraGeneratorProd::PhokaraGeneratorProd( const PhokaraGeneratorProd& iPhokaraGeneratorProd )
+// {
+//    *this = iPhokaraGeneratorProd;
+// }
+
+PhokaraGeneratorProd::~PhokaraGeneratorProd()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// assignment operators
+//
+// const PhokaraGeneratorProd& PhokaraGeneratorProd::operator=( const PhokaraGeneratorProd& iPhokaraGeneratorProd )
+// {
+//   if( this != &iPhokaraGeneratorProd ) {
+//      // do actual copying here, plus:
+//      // "SuperClass"::operator=( iPhokaraGeneratorProd );
+//   }
+//
+//   return *this;
+// }
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+PhokaraGeneratorProd::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+}
+
+extern "C"
+void 
+bby_finishup_() ;
+// -------------------- terminate method ----------------------------
+void
+PhokaraGeneratorProd::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+   
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+   bby_finishup_();
+}
+
+// ---------------- standard place to book histograms ---------------
+void
+PhokaraGeneratorProd::hist_book( HIHistoManager& )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+
+}
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

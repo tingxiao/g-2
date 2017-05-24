@@ -1,0 +1,118 @@
+// -*- C++ -*-
+#if !defined(L02_SHOWER_L02_SHOWER_H)
+#define L02_SHOWER_L02_SHOWER_H
+//
+// Package:     <L02_Shower>
+// Module:      L02_Shower
+//
+/**\class L02_Shower L02_Shower.h L02_Shower/L02_Shower.h
+ 
+ Description: <one line class summary>
+
+ Usage:
+    <usage>
+
+*/
+//
+// Author:      James Alexander
+// Created:     Wed Jan  1 08:01:30 EST 2003
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+// system include files
+
+// user include files
+#include "Processor/Processor.h"
+#include "HistogramInterface/HistogramPackage.h"
+
+// forward declarations
+
+class L02_Shower : public Processor
+{
+      // ------------ friend classes and functions --------------
+
+   public:
+      // ------------ constants, enums and typedefs --------------
+
+      // ------------ Constructors and destructor ----------------
+      L02_Shower( void );                      // anal1 
+      virtual ~L02_Shower();                   // anal5 
+
+      // ------------ member functions ---------------------------
+
+      // methods for beginning/end "Interactive"
+      virtual void init( void );             // anal1 "Interactive"
+      virtual void terminate( void );        // anal5 "Interactive"
+
+      // standard place for booking histograms
+      virtual void hist_book( HIHistoManager& );                  
+
+      // methods for binding to streams (anal2-4 etc.)
+      virtual ActionBase::ActionResult event( Frame& iFrame );
+      //virtual ActionBase::ActionResult beginRun( Frame& iFrame);
+      //virtual ActionBase::ActionResult endRun( Frame& iFrame);
+
+      // ------------ const member functions ---------------------
+
+      // ------------ static member functions --------------------
+
+   protected:
+      // ------------ protected member functions -----------------
+
+      // ------------ protected const member functions -----------
+
+   private:
+      // ------------ Constructors and destructor ----------------
+      L02_Shower( const L02_Shower& );
+
+      // ------------ assignment operator(s) ---------------------
+      const L02_Shower& operator=( const L02_Shower& );
+
+      // ------------ private member functions -------------------
+      void bind( 
+         ActionBase::ActionResult (L02_Shower::*iMethod)( Frame& ),
+	      const Stream::Type& iStream );
+
+      // ------------ private const member functions -------------
+
+      // ------------ data members -------------------------------
+
+
+      HIHist1D* m_allEnergy          ; 
+      HIHist1D* m_allPhi             ; 
+      HIHist1D* m_allTheta           ; 
+      HIHist1D* m_goodBTheta         ; 
+      HIHist1D* m_transitionTheta    ; 
+      HIHist1D* m_goodECTheta        ; 
+      HIHist1D* m_innerECTheta       ; 
+      				    
+      HIHist1D* m_allGBe9oe25        ; 
+      HIHist1D* m_allGBe1oe9	     ; 
+      HIHist1D* m_allGBmass          ; 
+      HIHist1D* m_allGBwidth	     ; 
+      				    
+      				    
+      HIHist1D* m_matchedGBEnergy    ; 
+      HIHist1D* m_matchedGBthisEnergy; 
+      HIHist1D* m_matchedGBeOverP    ; 
+      HIHist1D* m_matchedGBthise9oe25; 
+      				    
+      HIHist1D* m_unMatchedGBEnergy  ; 
+
+
+
+
+
+
+
+      // ------------ static data members ------------------------
+
+};
+
+// inline function definitions
+
+#endif /* L02_SHOWER_L02_SHOWER_H */

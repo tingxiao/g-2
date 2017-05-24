@@ -1,0 +1,1240 @@
+// -*- C++ -*-
+//
+// Package:     JpsiPiPiProc
+// Module:      JpsiPiPiProc
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      Sean Dobbs
+// Created:     Wed Jul  7 17:32:00 EDT 2004
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "JpsiPiPiProc/JpsiPiPiProc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "Navigation/NavTrack.h"
+#include "TrackRoot/TRHelixFit.h"
+#include "TrackRoot/TRTrackFitQuality.h"
+#include "TrackRoot/TRSeedTrackQuality.h"
+#include "TrackDelivery/TDKinematicFit.h"
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+
+#include <Navigation/NavRich.h> 
+#include <Navigation/NavKs.h>
+#include <DedxInfo/DedxInfo.h>
+#include <Navigation/NavMuonId.h> 
+#include <Navigation/NavElecId.h> 
+#include <VXFitVeeCandidate/VXFitVeeKShort.h> 
+
+#include "Navigation/NavPi0ToGG.h" 
+#include "Navigation/NavEtaToGG.h" 
+#include "Navigation/NavTkShMatch.h"
+#include "BeamEnergy/BeamEnergy.h"
+#include "BeamSpot/BeamSpot.h"
+#include <PhotonDecays/PhdPi0.h> 
+
+#include <CleoDB/DBEventHeader.h> 
+
+// Histogram/Ntuple include files
+#include "HistogramInterface/HIHist1D.h"
+#include "HistogramInterface/HINtupleVarNames.h"
+#include "HistogramInterface/HINtupleArray.h"
+
+#include <FitEvt/FitEvt.h>
+#include <FitEvt/FitEvtSettings.h>
+
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+#include <iostream>
+//4#include <fstream>
+
+ofstream *outf;
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.JpsiPiPiProc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.33 2002/12/18 01:45:06 cdj Exp $";
+static const char* const kTagString = "$Name: v06_08_00 $";
+
+//
+// static data member definitions
+//
+
+//make proton selection
+static DABoolean is_proton ( const NavTrack &the_track )
+{
+
+   //DABoolean pass = false;
+   FAItem<DedxInfo> the_dedx = the_track.dedxInfo();
+   FAItem<NavRich> the_rich = the_track.richInfo();
+   FAItem<TDKinematicFit> protonFit = the_track.protonFit();
+
+   if(!protonFit.valid() || !the_dedx.valid()) return false;
+
+   double cos_theta = protonFit->pz() / protonFit->pmag();
+
+   // Dedx PID
+   double pi_sig = the_dedx->piSigma();
+   double p_sig = the_dedx->pSigma();
+   double k_sig = the_dedx->kSigma();
+   
+   // require 3 sigma consistency
+   if( (protonFit->pmag() < 1.2) && (fabs(p_sig) > 3) )
+      return false;
+   
+   double DL_ppi = (p_sig*p_sig) - (pi_sig*pi_sig);
+   double DL_pk  = (p_sig*p_sig) - (k_sig*k_sig);
+
+   if(the_rich.valid() 
+      && (protonFit->pmag() > 1.2)
+      && (fabs(cos_theta) < 0.8) ) {
+      
+      if( (the_rich->pionHypWasAnalyzed())
+	  && (the_rich->pionNumberOfPhotonsInAverage() > 2) ) {
+	 DL_ppi -= the_rich->pionLogLikelihood();
+      }
+      if(the_rich->kaonHypWasAnalyzed()		  
+	 && (the_rich->kaonNumberOfPhotonsInAverage() > 2) ) {
+	 DL_pk -= the_rich->kaonLogLikelihood();
+      }
+      // if(protonFit->pmag() > 1.2) {
+      if(the_rich->protonHypWasAnalyzed()		  
+	 && (the_rich->protonNumberOfPhotonsInAverage() > 2) ) {
+	DL_ppi += the_rich->protonLogLikelihood();
+	DL_pk += the_rich->protonLogLikelihood();
+      }
+      //}
+   }
+
+   return ( ( DL_ppi < 0. ) && ( DL_pk < 0. ) );
+}
+
+//
+// constructors and destructor
+//
+JpsiPiPiProc::JpsiPiPiProc( void )               // anal1
+   : Processor( "JpsiPiPiProc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &JpsiPiPiProc::event,    Stream::kEvent );
+   bind( &JpsiPiPiProc::beginRun, Stream::kBeginRun );
+   //bind( &JpsiPiPiProc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+JpsiPiPiProc::~JpsiPiPiProc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+JpsiPiPiProc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+
+   m_beam_x = 0.;
+   m_beam_y = 0.;
+   m_beam_z = 0.;
+
+   //   outf = new ofstream("pis.out")
+}
+
+// -------------------- terminate method ----------------------------
+void
+JpsiPiPiProc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+
+enum { k_NShower, k_NTrack, k_TCharge, k_NPi0, k_NEta,
+       k_Energy_1, k_Barrel_1, k_Theta_1, k_Phi_1,
+       k_Energy_2, k_Barrel_2, k_Theta_2, k_Phi_2,
+       k_Energy_3, k_Barrel_3, k_Theta_3, k_Phi_3,
+       k_Energy_4, k_Barrel_4, k_Theta_4, k_Phi_4,
+       k_Energy_5, k_Barrel_5, k_Theta_5, k_Phi_5,
+       k_Energy_6, k_Barrel_6, k_Theta_6, k_Phi_6,
+
+       k_TE_1, k_Px_1, k_Py_1, k_Pz_1, 
+       k_ETE_1, k_EPx_1, k_EPy_1, k_EPz_1, 
+       k_MuTE_1, k_MuPx_1, k_MuPy_1, k_MuPz_1, 
+         k_Chg_1, k_DOCA_1, k_Z0_1, k_ReChiSq_1, k_EID_1, k_MuID_1,
+         k_LLpi_1, k_LLk_1, k_LLp_1, k_SigPi_1, k_SigK_1, k_SigP_1,
+         k_DL_pip_1, k_DL_pik_1, 
+         k_EP_1, k_DptMu_1,
+       k_TE_2, k_Px_2, k_Py_2, k_Pz_2, 
+       k_ETE_2, k_EPx_2, k_EPy_2, k_EPz_2, 
+       k_MuTE_2, k_MuPx_2, k_MuPy_2, k_MuPz_2, 
+         k_Chg_2, k_DOCA_2, k_Z0_2, k_ReChiSq_2, k_EID_2, k_MuID_2,
+         k_LLpi_2, k_LLk_2, k_LLp_2, k_SigPi_2, k_SigK_2, k_SigP_2,
+         k_DL_pip_2, k_DL_pik_2, 
+         k_EP_2, k_DptMu_2,
+       k_TE_3, k_Px_3, k_Py_3, k_Pz_3, 
+       k_ETE_3, k_EPx_3, k_EPy_3, k_EPz_3, 
+       k_MuTE_3, k_MuPx_3, k_MuPy_3, k_MuPz_3, 
+         k_Chg_3, k_DOCA_3, k_Z0_3, k_ReChiSq_3, k_EID_3, k_MuID_3,
+         k_LLpi_3, k_LLk_3, k_LLp_3, k_SigPi_3, k_SigK_3, k_SigP_3,
+         k_DL_pip_3, k_DL_pik_3, 
+         k_EP_3, k_DptMu_3,
+       k_TE_4, k_Px_4, k_Py_4, k_Pz_4, 
+       k_ETE_4, k_EPx_4, k_EPy_4, k_EPz_4, 
+       k_MuTE_4, k_MuPx_4, k_MuPy_4, k_MuPz_4, 
+         k_Chg_4, k_DOCA_4, k_Z0_4, k_ReChiSq_4, k_EID_4, k_MuID_4,
+         k_LLpi_4, k_LLk_4, k_LLp_4, k_SigPi_4, k_SigK_4, k_SigP_4,
+         k_DL_pip_4, k_DL_pik_4, 
+         k_EP_4, k_DptMu_4,
+
+       k_NeutE,
+
+       k_RunNum, k_EvtNum,     
+
+       k_pipi_Jpsi_E, k_pipi_Jpsi_Px, k_pipi_Jpsi_Py, k_pipi_Jpsi_Pz, 
+       k_pipi_Jpsi_VtxChisq, k_pipi_Jpsi_FitChisq, 
+       k_pipi_Psip_VtxChisq, k_pipi_Psip_FitChisq, 
+       k_pipi_E, k_pipi_Px, k_pipi_Py, k_pipi_Pz, 
+       k_pipi_VtxChisq, k_pipi_FitChisq, 
+
+       kNumVars };
+
+
+void
+JpsiPiPiProc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+   HINtupleVarNames ntNames(kNumVars);
+
+   ntNames.addVar(k_NShower, "NShower");
+   ntNames.addVar(k_NTrack, "NTrack");
+   ntNames.addVar(k_TCharge, "TCharge");
+   ntNames.addVar(k_NPi0, "NPi0");
+   ntNames.addVar(k_NEta, "NEta");
+
+   ntNames.addVar(k_Energy_1, "E1");
+   ntNames.addVar(k_Barrel_1, "Barrel1");
+   ntNames.addVar(k_Theta_1, "Theta1");
+   ntNames.addVar(k_Phi_1, "Phi1");
+   ntNames.addVar(k_Energy_2, "E2");
+   ntNames.addVar(k_Barrel_2, "Barrel2");
+   ntNames.addVar(k_Theta_2, "Theta2");
+   ntNames.addVar(k_Phi_2, "Phi2");
+   ntNames.addVar(k_Energy_3, "E3");
+   ntNames.addVar(k_Barrel_3, "Barrel3");
+   ntNames.addVar(k_Theta_3, "Theta3");
+   ntNames.addVar(k_Phi_3, "Phi3");
+   ntNames.addVar(k_Energy_4, "E4");
+   ntNames.addVar(k_Barrel_4, "Barrel4");
+   ntNames.addVar(k_Theta_4, "Theta4");
+   ntNames.addVar(k_Phi_4, "Phi4");
+   ntNames.addVar(k_Energy_5, "E5");
+   ntNames.addVar(k_Barrel_5, "Barrel5");
+   ntNames.addVar(k_Theta_5, "Theta5");
+   ntNames.addVar(k_Phi_5, "Phi5");
+   ntNames.addVar(k_Energy_6, "E6");
+   ntNames.addVar(k_Barrel_6, "Barrel6");
+   ntNames.addVar(k_Theta_6, "Theta6");
+   ntNames.addVar(k_Phi_6, "Phi6");
+
+
+   // track data
+   ntNames.addVar(k_TE_1, "TE1");
+   ntNames.addVar(k_Px_1, "Px1");
+   ntNames.addVar(k_Py_1, "Py1");
+   ntNames.addVar(k_Pz_1, "Pz1");
+   ntNames.addVar(k_ETE_1, "ETE1");
+   ntNames.addVar(k_EPx_1, "EPx1");
+   ntNames.addVar(k_EPy_1, "EPy1");
+   ntNames.addVar(k_EPz_1, "EPz1");
+   ntNames.addVar(k_MuTE_1, "MuTE1");
+   ntNames.addVar(k_MuPx_1, "MuPx1");
+   ntNames.addVar(k_MuPy_1, "MuPy1");
+   ntNames.addVar(k_MuPz_1, "MuPz1");
+   ntNames.addVar(k_Chg_1, "Chg1"); 
+   ntNames.addVar(k_DOCA_1, "DOCA1");
+   ntNames.addVar(k_Z0_1, "Z01");
+   ntNames.addVar(k_ReChiSq_1, "Rchisq1");
+   ntNames.addVar(k_EID_1, "EID1");
+   ntNames.addVar(k_MuID_1, "MuID1");
+   ntNames.addVar(k_LLpi_1, "LLpi1");
+   ntNames.addVar(k_LLk_1, "LLk1");
+   ntNames.addVar(k_LLp_1, "LLp1");
+   ntNames.addVar(k_SigPi_1, "SigPi1");
+   ntNames.addVar(k_SigK_1, "SigK1");
+   ntNames.addVar(k_SigP_1, "SigP1");
+   ntNames.addVar(k_DL_pip_1, "DLppi1");
+   ntNames.addVar(k_DL_pik_1, "DLpk1");
+   ntNames.addVar(k_DptMu_1, "DptMu1");
+   ntNames.addVar(k_EP_1, "EP1");
+   ntNames.addVar(k_TE_2, "TE2"); 
+   ntNames.addVar(k_Px_2, "Px2"); 
+   ntNames.addVar(k_Py_2, "Py2"); 
+   ntNames.addVar(k_Pz_2, "Pz2"); 
+   ntNames.addVar(k_ETE_2, "ETE2");
+   ntNames.addVar(k_EPx_2, "EPx2");
+   ntNames.addVar(k_EPy_2, "EPy2");
+   ntNames.addVar(k_EPz_2, "EPz2");
+   ntNames.addVar(k_MuTE_2, "MuTE2");
+   ntNames.addVar(k_MuPx_2, "MuPx2");
+   ntNames.addVar(k_MuPy_2, "MuPy2");
+   ntNames.addVar(k_MuPz_2, "MuPz2");
+   ntNames.addVar(k_Chg_2, "Chg2"); 
+   ntNames.addVar(k_DOCA_2, "DOCA2");
+   ntNames.addVar(k_Z0_2, "Z02");
+   ntNames.addVar(k_ReChiSq_2, "Rchisq2");
+   ntNames.addVar(k_EID_2, "EID2");
+   ntNames.addVar(k_MuID_2, "MuID2");
+   ntNames.addVar(k_LLpi_2, "LLpi2");
+   ntNames.addVar(k_LLk_2, "LLk2");
+   ntNames.addVar(k_LLp_2, "LLp2");
+   ntNames.addVar(k_SigPi_2, "SigPi2");
+   ntNames.addVar(k_SigK_2, "SigK2");
+   ntNames.addVar(k_SigP_2, "SigP2");
+   ntNames.addVar(k_DL_pip_2, "DLppi2");
+   ntNames.addVar(k_DL_pik_2, "DLpk2");
+   ntNames.addVar(k_DptMu_2, "DptMu2");
+   ntNames.addVar(k_EP_2, "EP2");
+   ntNames.addVar(k_TE_3, "TE3");
+   ntNames.addVar(k_Px_3, "Px3");
+   ntNames.addVar(k_Py_3, "Py3");
+   ntNames.addVar(k_Pz_3, "Pz3");
+   ntNames.addVar(k_ETE_3, "ETE3");
+   ntNames.addVar(k_EPx_3, "EPx3");
+   ntNames.addVar(k_EPy_3, "EPy3");
+   ntNames.addVar(k_EPz_3, "EPz3");
+   ntNames.addVar(k_MuTE_3, "MuTE3");
+   ntNames.addVar(k_MuPx_3, "MuPx3");
+   ntNames.addVar(k_MuPy_3, "MuPy3");
+   ntNames.addVar(k_MuPz_3, "MuPz3");
+   ntNames.addVar(k_Chg_3, "Chg3"); 
+   ntNames.addVar(k_DOCA_3, "DOCA3");
+   ntNames.addVar(k_Z0_3, "Z03");
+   ntNames.addVar(k_ReChiSq_3, "Rchisq3");
+   ntNames.addVar(k_EID_3, "EID3");
+   ntNames.addVar(k_MuID_3, "MuID3");
+   ntNames.addVar(k_LLpi_3, "LLpi3");
+   ntNames.addVar(k_LLk_3, "LLk3");
+   ntNames.addVar(k_LLp_3, "LLp3");
+   ntNames.addVar(k_SigPi_3, "SigPi3");
+   ntNames.addVar(k_SigK_3, "SigK3");
+   ntNames.addVar(k_SigP_3, "SigP3");
+   ntNames.addVar(k_DL_pip_3, "DLppi3");
+   ntNames.addVar(k_DL_pik_3, "DLpk3");
+   ntNames.addVar(k_DptMu_3, "DptMu3");
+   ntNames.addVar(k_EP_3, "EP3");
+   ntNames.addVar(k_TE_4, "TE4"); 
+   ntNames.addVar(k_Px_4, "Px4"); 
+   ntNames.addVar(k_Py_4, "Py4"); 
+   ntNames.addVar(k_Pz_4, "Pz4"); 
+   ntNames.addVar(k_ETE_4, "ETE4");
+   ntNames.addVar(k_EPx_4, "EPx4");
+   ntNames.addVar(k_EPy_4, "EPy4");
+   ntNames.addVar(k_EPz_4, "EPz4");
+   ntNames.addVar(k_MuTE_4, "MuTE4");
+   ntNames.addVar(k_MuPx_4, "MuPx4");
+   ntNames.addVar(k_MuPy_4, "MuPy4");
+   ntNames.addVar(k_MuPz_4, "MuPz4");
+   ntNames.addVar(k_Chg_4, "Chg4"); 
+   ntNames.addVar(k_DOCA_4, "DOCA4");
+   ntNames.addVar(k_Z0_4, "Z04");
+   ntNames.addVar(k_ReChiSq_4, "Rchisq4");
+   ntNames.addVar(k_EID_4, "EID4");
+   ntNames.addVar(k_MuID_4, "MuID4");
+   ntNames.addVar(k_LLpi_4, "LLpi4");
+   ntNames.addVar(k_LLk_4, "LLk4");
+   ntNames.addVar(k_LLp_4, "LLp4");
+   ntNames.addVar(k_SigPi_4, "SigPi4");
+   ntNames.addVar(k_SigK_4, "SigK4");
+   ntNames.addVar(k_SigP_4, "SigP4");
+   ntNames.addVar(k_DL_pip_4, "DLppi4");
+   ntNames.addVar(k_DL_pik_4, "DLpk4");
+   ntNames.addVar(k_EP_4, "EP4");
+   ntNames.addVar(k_DptMu_4, "DptMu4");
+
+   ntNames.addVar(k_RunNum, "RunNum");
+   ntNames.addVar(k_EvtNum, "EvtNum");
+
+   ntNames.addVar(k_NeutE, "NeutE");
+
+
+   ntNames.addVar(k_pipi_Jpsi_E, "JpsiE");
+   ntNames.addVar(k_pipi_Jpsi_Px, "JpsiPx");
+   ntNames.addVar(k_pipi_Jpsi_Py, "JpsiPy");
+   ntNames.addVar(k_pipi_Jpsi_Pz, "JpsiPz");
+   ntNames.addVar(k_pipi_E, "PipiE");
+   ntNames.addVar(k_pipi_Px, "PipiPx");
+   ntNames.addVar(k_pipi_Py, "PipiPy");
+   ntNames.addVar(k_pipi_Pz, "PipiPz");
+
+   ntNames.addVar(k_pipi_VtxChisq, "PipiVtx");
+   ntNames.addVar(k_pipi_FitChisq, "PipiFit");
+   ntNames.addVar(k_pipi_Jpsi_VtxChisq, "JpsiVtx");
+   ntNames.addVar(k_pipi_Jpsi_FitChisq, "JpsiFit");
+   ntNames.addVar(k_pipi_Psip_VtxChisq, "PsipVtx");
+   ntNames.addVar(k_pipi_Psip_FitChisq, "PsipFit");
+
+
+
+   m_LEGammaNt = iHistoManager.ntuple( 25, "LE Gammas",
+				       kNumVars, 50000, ntNames.names());
+
+   h_mjpsi = iHistoManager.histogram(1, "mjpsi", 800, 2.5, 3.3);
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+JpsiPiPiProc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+
+   const int kMaxShower = 10, kMaxTrack = 10;
+   const int kMaxPi0 = 10;
+   const int kMaxEta = 10;
+
+
+   NavShower::Identifier SID[kMaxShower];
+   double E[kMaxShower] = 
+           {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10., -10.};  
+
+   double BigE[kMaxShower] = 
+              {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10., -10.};  
+
+   double E9E25[kMaxShower] =
+               {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10., -10.};  
+
+   double Theta[kMaxShower] =
+               {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10., -10.};  
+
+   double Phi[kMaxShower] = 
+             {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10., -10.};  
+
+   double Cang[kMaxShower] = {-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.};
+   double Split[kMaxShower] = {-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.,-1.};
+
+   double Barrel[kMaxShower] = {0.,0.,0.,0.,0.,0.,0.,0.,0.,0.};
+
+//   double XP[2] = {-10.,-10.}, XPT[2];
+
+   double PE[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double PPx[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double PPy[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double PPz[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EE[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EPx[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EPy[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EPz[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MuE[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MuPx[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MuPy[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MuPz[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double Charge[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,
+			       -10.};
+   double D0[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double Z0[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double HitFrac[kMaxTrack] = {100.,100.,100.,100.,100.,100.,100.,100.,100.,100.};
+   double ReChiSq[kMaxTrack] = {1000.,1000.,1000.,1000.,1000.,1000.,1000.,1000.,
+				   1000.,1000.};
+   double DOCA[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EID[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MUID[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EP[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double MuDepth[kMaxTrack] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+
+
+   double PISIG[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double KSIG[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double PSIG[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double PILL[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double KLL[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double PLL[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double DLPIP[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double DLPIK[kMaxTrack] = {-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,-1000.,
+				 -1000.,-1000.,-1000.};
+   double P0E[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double P0PX[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double P0PY[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double P0PZ[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double P0PullM[kMaxPi0] = {-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.};
+   double P0HiSID[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double P0LoSID[kMaxPi0] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaE[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaPX[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaPY[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaPZ[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaPullM[kMaxEta] = {-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.,-100.};
+   double EtaHiSID[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+   double EtaLoSID[kMaxEta] = {-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.,-10.};
+
+   float ntVal[kNumVars];
+//   double EMax = 0.;
+   int m,n,p;
+   int i,j,k,l;
+   double DL_pik, DL_pip, neutralEnergy = 0;
+
+   FAItem< DBEventHeader > eventHeader ;
+   extract( iFrame.record( Stream::kEvent ), eventHeader ) ;
+
+   double the_run = eventHeader->run();
+   double the_evt = eventHeader->number();
+
+
+
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   FAItem< MagneticField > cleoBField;
+   extract( iFrame.record( Stream::kBeginRun ), cleoBField );
+
+   FitEvtSettings &settings(FitEvtSettings::instance());
+   settings.setField(*cleoBField);
+   settings.setBeamSpot(*spot);
+   settings.setLorVecCM( beam_energy->value() ); 
+
+
+   vector< FAItem<TDKinematicFit> > muon_tracks;
+   vector< FAItem<TDKinematicFit> > pion_tracks;
+   vector< FAItem<TDKinematicFit> > other_tracks;
+
+   vector< int > muon_ids;
+   vector< int > pion_ids;
+   vector< int > other_ids;
+
+   // Create a table of tracks and fill it.
+   FATable< NavTrack > trackTable;
+   extract( iFrame.record( Stream::kEvent ) , trackTable, "GoodThings" );
+
+   FATable< NavTrack >::const_iterator trackTableBegin = trackTable.begin();
+   FATable< NavTrack >::const_iterator trackTableEnd = trackTable.end();
+
+   // Loop over tracks.
+   int numTrack=0, numFit=0;
+   double tCharge=0;
+   int numPi0=0;
+   int numEta=0;
+
+   int num_electron=0;
+   int num_muon=0;
+
+   //cerr << "tracks: " << trackTable.size() << endl;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackTableBegin;
+         trackItr != trackTableEnd ;
+         ++trackItr )
+   {
+      double tr_en, tr_px, tr_py, tr_pz, tr_chg;
+      double tr_z0, tr_rechisq, tr_doca;
+      FAItem<TDKinematicFit> pionFit = trackItr->pionFit();
+      FAItem<TDKinematicFit> electronFit = trackItr->electronFit();
+      FAItem<TDKinematicFit> muonFit = trackItr->muonFit();
+      FAItem<TRTrackFitQuality> pionQuality = trackItr->pionQuality();
+      FAItem<TRHelixFit> pionHelix = trackItr->pionHelix();
+      FAItem<TDKinematicFit> protonFit = trackItr->protonFit();
+      FAItem<TRTrackFitQuality> protonQuality = trackItr->protonQuality();
+      FAItem<TRHelixFit> protonHelix = trackItr->protonHelix();
+      FAItem<DedxInfo> the_dedx = trackItr->dedxInfo();
+      FAItem<NavRich> the_rich = trackItr->richInfo();
+      double piLL = -1000;
+      double kLL = -1000;
+      double pLL = -1000;
+      double DL_pik = -1000;
+      double DL_pip = -1000;
+      double pi_sig = -1000;
+      double k_sig = -1000;
+      double p_sig = -1000;
+
+      if(trackItr.valid() 
+	 && pionFit.valid()
+	 && pionHelix.valid() ) {
+	 numTrack++;
+	 
+	 // require 50 MeV < p < 2.2 Gev tracks - potential QED contamination
+	 //  4.26 / 2 = 2.13
+	 if((pionFit->pmag() > 0.05) && (pionFit->pmag() < 2.2)) {
+	    
+	    //cerr << "track: " << numTrack << " " << pionFit->lorentzMomentum() << endl;
+
+	    // PID
+	    if(the_dedx.valid()) {
+	       pi_sig = the_dedx->piSigma();
+	       p_sig = the_dedx->pSigma();
+	       k_sig = the_dedx->kSigma();
+
+	       // if the proton is more like a kaon
+	       DL_pik = (pi_sig*pi_sig) - (k_sig*k_sig);
+
+	       // if the proton is more like a pion
+	       DL_pip = (pi_sig*pi_sig) - (p_sig*p_sig);
+
+	       // if RICH is good, use combined info
+	       if(the_rich.valid()
+		     && (pionFit->pmag() > 0.6)
+		     && (fabs(pionHelix->cotTheta()) < 1.33)  //|cos th|<0.8
+		     && (the_rich->pionHypWasAnalyzed())
+		     && (the_rich->pionNumberOfPhotonsInAverage() > 2) ) 
+	       {
+		  piLL = the_rich->pionLogLikelihood();
+		  if(the_rich->kaonHypWasAnalyzed()		  
+		     && (the_rich->kaonNumberOfPhotonsInAverage() > 2) ) {
+		     kLL = the_rich->kaonLogLikelihood();
+		     DL_pik += the_rich->pionLogLikelihood()
+			      - the_rich->kaonLogLikelihood();
+		  }
+		  if(the_rich->protonHypWasAnalyzed()		  
+		     && (the_rich->protonNumberOfPhotonsInAverage() > 2) ) {
+		     pLL = the_rich->protonLogLikelihood();
+		     DL_pip += the_rich->pionLogLikelihood()
+			       - the_rich->protonLogLikelihood();
+		  }
+		  
+	       }
+	    }
+
+	    //cerr << trackItr->identifier() << " " << trackItr->pionFit()->lorentzMomentum() << endl;
+
+	    tr_en = pionFit->energy();
+	    tr_px = pionFit->px();
+	    tr_py = pionFit->py();
+	    tr_pz = pionFit->pz();
+	    tr_chg = pionFit->charge();
+	    tr_z0 = pionHelix->z0(); 
+	    tr_doca = calcDOCA(pionHelix->d0(), pionHelix->phi0());
+	    tr_rechisq = 10000.;
+	    if(pionQuality->degreesOfFreedom() != 0.) {
+	       tr_rechisq = pionQuality->chiSquare() / 
+		  pionQuality->degreesOfFreedom();
+	    }
+
+	    FATable<NavShower> brem(trackItr->bremShowers());
+
+	    HepDouble gamsx = 0., gamsy = 0., gamsz = 0., gamsp = 0.;
+	    HepDouble e_en = 0.;
+	    for(FATable<NavShower>::const_iterator iGam=brem.begin();
+		iGam != brem.end(); ++iGam) {
+	       gamsx += iGam->attributes().momentum().x();
+	       gamsy += iGam->attributes().momentum().y();
+	       gamsz += iGam->attributes().momentum().z();
+	    }
+	    gamsp = sqrt(gamsx*gamsx + gamsy*gamsy + gamsz*gamsz);
+
+	    e_en = sqrt(fabs( 0.000511*0.000511 
+			+ (electronFit->px()+gamsx)*(electronFit->px()+gamsx)
+			+ (electronFit->py()+gamsy)*(electronFit->py()+gamsy)
+			+ (electronFit->pz()+gamsz)*(electronFit->pz()+gamsz) ));
+
+	    // make cuts
+
+	    // do protons instead
+
+	    if( pionFit->pmag() > 1.0 ) {
+	      if( trackItr->elecId().eOverP() < 0.5 ) {
+		muon_tracks.push_back( muonFit );
+		muon_ids.push_back( numFit );
+		num_muon++;
+	      }
+	    } else {
+	      //if( fabs(pi_sig) < 3. )
+	      //pion_tracks.push_back( pionFit );
+	      other_tracks.push_back( pionFit );
+	      other_ids.push_back( numFit );
+	    }
+
+
+	    /*
+	    if( tr_rechisq > 3. ) continue;
+	    if( pionQuality->ratioNumberHitsToExpected() < 0.6) continue;
+	    if( pionFit->pperp() < 0.120) continue;
+
+	    const double pcosth = pionFit->pz() / pionFit->pmag();
+	    if(fabs(pcosth) > 0.8) continue;
+	    */
+
+	    /*
+	    if( is_proton(*trackItr) ) {
+	      //if( trackItr->elecId().eOverP() < 0.5 )
+	      muon_tracks.push_back( protonFit );
+	    } else {
+	      //if( fabs(pi_sig) < 3. )
+	      pion_tracks.push_back( pionFit );
+	    }
+	    */
+	    /**
+	    if( pionFit->pmag() > 1.0 ) {
+	      if( trackItr->elecId().eOverP() < 0.5 ) {
+		num_muon++;
+	      }
+	      if( trackItr->elecId().eOverP() > 0.8 ) {
+		num_electron++;
+	      }
+	    }
+	    **/
+
+	    // save track
+
+	    if(numFit < kMaxTrack) {
+	       PE[numFit] = tr_en;
+	       PPx[numFit] = tr_px;
+	       PPy[numFit] = tr_py;
+	       PPz[numFit] = tr_pz;
+	       EE[numFit] = electronFit->energy();
+	       EPx[numFit] = electronFit->px() + gamsx;
+	       EPy[numFit] = electronFit->py() + gamsy;
+	       EPz[numFit] = electronFit->pz() + gamsz;
+	       MuE[numFit] = muonFit->energy();
+	       MuPx[numFit] = muonFit->px();
+	       MuPy[numFit] = muonFit->py();
+	       MuPz[numFit] = muonFit->pz();
+	       //MuE[numFit] = protonFit->energy();
+	       //MuPx[numFit] = protonFit->px();
+	       //MuPy[numFit] = protonFit->py();
+	       //MuPz[numFit] = protonFit->pz();
+	       Charge[numFit] = tr_chg;
+	       Z0[numFit] = tr_z0 - m_beam_z;  // beam spot corrected
+	       DOCA[numFit] = tr_doca;
+
+	       PISIG[numFit] = pi_sig;
+	       KSIG[numFit] = k_sig;
+	       PSIG[numFit] = p_sig;
+	       PILL[numFit] = piLL;
+	       KLL[numFit] = kLL;
+	       PLL[numFit] = pLL;
+ 	       //EID[numFit] = trackItr->elecId().simpleElecId2();
+	       MUID[numFit] = trackItr->muonId().simpleMuonId1();
+ 
+	       DLPIP[numFit] = DL_pip;
+	       DLPIK[numFit] = DL_pik;
+	       if(pionQuality->degreesOfFreedom() != 0.)
+		  ReChiSq[numFit] = tr_rechisq;
+	       EID[numFit] = pionQuality->ratioNumberHitsToExpected();   // hacky!!
+
+	       EP[numFit] = trackItr->elecId().eOverP();
+	       MuDepth[numFit] = trackItr->muonId().depth();
+	    }
+
+	    
+	    tCharge += pionFit->charge();
+	    numFit++;  // number of good tracks
+	 }
+      }
+   }
+
+   /**
+   // REQUIRE: ntrack = 4
+   //if( (numFit < 3) || (numFit > 4) )
+   if( ( muon_tracks.size() != 2 ) || ( pion_tracks.size() != 2 ) )
+     return ActionBase::kFailed;
+
+
+   if( muon_tracks[0]->charge() != -muon_tracks[1]->charge() )
+     return ActionBase::kFailed;
+
+   if( pion_tracks[0]->charge() != -pion_tracks[1]->charge() )
+     return ActionBase::kFailed;
+
+   // cuts on J/psi mass and pipi recoil mass
+   HepLorentzVector jpsi4v = muon_tracks[0]->lorentzMomentum() + muon_tracks[1]->lorentzMomentum();
+   double pipi_recmass = sqrt(pow(3.686 - pion_tracks[0]->energy() - pion_tracks[1]->energy(),2.)
+			      - pow(pion_tracks[1]->px() + pion_tracks[1]->px(),2.)
+			      - pow(pion_tracks[1]->py() + pion_tracks[1]->py(),2.)
+			      - pow(pion_tracks[1]->pz() + pion_tracks[1]->pz(),2.) );
+
+
+   if( (jpsi4v.m() < 2.75) || (jpsi4v.m() > 3.45) )
+   //if( (jpsi4v.m() < 2.9) || (jpsi4v.m() > 3.25) )
+   //if( (jpsi4v.m() < 2.8) || (jpsi4v.m() > 3.3) )
+      return ActionBase::kFailed;
+
+   if( (pipi_recmass < 3.05) || (pipi_recmass > 3.15) )
+      return ActionBase::kFailed;
+   
+
+   //   if( (numFit > 4) || (numFit < 2) )
+   //return ActionBase::kFailed;
+   **/
+
+
+   if( ( num_electron != 2 ) && ( num_muon != 2 ) )
+     return ActionBase::kFailed;
+
+   // slightly tighter muon id
+   if( ( EP[muon_ids[0]] > 0.25 ) && ( EP[muon_ids[1]] > 0.25 ) )
+     return ActionBase::kFailed;
+
+   // cut on J/psi
+   HepLorentzVector jpsi4v = muon_tracks[0]->lorentzMomentum() + muon_tracks[1]->lorentzMomentum();
+
+   /*
+   if( (jpsi4v.m() < 2.75) || (jpsi4v.m() > 3.45) )
+   //if( (jpsi4v.m() < 2.9) || (jpsi4v.m() > 3.25) )
+   //if( (jpsi4v.m() < 2.8) || (jpsi4v.m() > 3.3) )
+      return ActionBase::kFailed;
+   */
+
+   // look for pi+pi- recoil
+   bool jpsi_found = false;
+   int ntrk = other_tracks.size();
+   for( int i=0; i<ntrk-1; i++) {
+     for (int j=i+1; j<ntrk; j++) {
+       double pipi_recmass = sqrt(pow(3.686 - other_tracks[i]->energy() - other_tracks[j]->energy(),2.)
+				  - pow(other_tracks[i]->px() + other_tracks[j]->px(),2.)
+				  - pow(other_tracks[i]->py() + other_tracks[j]->py(),2.)
+				  - pow(other_tracks[i]->pz() + other_tracks[j]->pz(),2.) );
+       
+       //if( (pipi_recmass > 3.05) && (pipi_recmass < 3.15) ) {
+       if( fabs(pipi_recmass-3.097) < 0.007 ) {
+	 jpsi_found = true;
+	 pion_tracks.push_back( other_tracks[i] );
+	 pion_tracks.push_back( other_tracks[j] );
+	 pion_ids.push_back( other_ids[i] );
+	 pion_ids.push_back( other_ids[j] );
+	 break;
+       }
+     }
+     
+     if(jpsi_found == true)
+       break;
+   }
+
+   if(!jpsi_found)
+     return ActionBase::kFailed;
+
+
+   // Create a table of showers and fill it.
+   FATable< NavShower > showerTable;
+   FATable< NavShower > showerSATable;   // SplitoffProd approved
+   extract( iFrame.record( Stream::kEvent ) , showerTable, "GoodThings" );
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+   FATable< NavShower >::const_iterator showerEnd = showerTable.end();
+   
+   //cerr << "showers: " << showerTable.size() << endl;
+
+   // Loop over showers.
+   int unmatchedShowers = 0;
+   int numPi0G = 0, numPi0GCut = 0;
+   double tEnergy = 0.0;
+   int hiEnShFnd = 0;
+
+   for (FATable< NavShower >::const_iterator showerItr = showerBegin; 
+        showerItr != showerEnd ; ++showerItr) {
+      if(showerItr->attributes().e9oe25OK()
+	 && (showerItr->attributes().goodBarrel() ||
+	     showerItr->attributes().goodEndcap() )
+	 && (showerItr->attributes().energy()>0.05) ) {
+	 
+	 int j = unmatchedShowers++;
+
+	 //cerr << "shower: " << j << " " << showerItr->photon().lorentzMomentum() << endl;
+	    
+	 neutralEnergy += showerItr->attributes().energy();
+
+	 if(showerItr->attributes().energy() >= 0.2)
+	    hiEnShFnd = 1;
+
+	 if(j<kMaxShower) {
+	    SID[j] = showerItr->identifier();
+
+	    E[j] = showerItr->attributes().energy();
+	    Theta[j] = showerItr->attributes().theta();
+	    Phi[j] = showerItr->attributes().phi();
+
+ 	    Barrel[j] = (showerItr->attributes().goodBarrel()>0);
+
+	 }
+
+      }
+   }
+
+   /**
+   if( unmatchedShowers > 1 )
+      return ActionBase::kFailed;
+   **/
+
+
+   h_mjpsi->fill( jpsi4v.m() );
+
+   /***/
+
+   const double kJpsiMass = 3.096916;
+   double PiPi4V[4] = {-10., -10., -10., -10.};
+   double PiPiJpsi4V[4] = {-10., -10., -10., -10.};
+   double pipi_vtxchisq=1000000., pipi_fitchisq=1000000.;
+   double jpsi_pipi_vtxchisq=1000000., jpsi_pipi_fitchisq=1000000.;
+   double psip_pipi_vtxchisq=1000000., psip_pipi_fitchisq=1000000.;
+
+   
+   FitEvt jpsi( "Jpsi", FitEvt::k_Mass, 0, kJpsiMass );
+   jpsi.newTrack( *muon_tracks[0] );
+   jpsi.newTrack( *muon_tracks[1] );
+
+   jpsi.doTheFit();
+
+   FitEvt pipi( "pipi", FitEvt::k_VertexOnly);
+   pipi.newTrack( *pion_tracks[0] );
+   pipi.newTrack( *pion_tracks[1] );
+
+   pipi.doTheFit();
+
+   if( (jpsi.chisqVtx()>0) && (jpsi.chisqFit()>0) 
+       && (pipi.chisqVtx()>0) ) {
+     jpsi_pipi_vtxchisq = jpsi.chisqVtx();
+     jpsi_pipi_fitchisq = jpsi.chisqFit();
+
+     pipi_vtxchisq = pipi.chisqVtx();
+     pipi_fitchisq = pipi.chisqFit();
+
+     FitEvt psip( "Psip", FitEvt::k_P4VecCM );
+     psip.newTrack( *pion_tracks[0] );
+     psip.newTrack( *pion_tracks[1] );
+     psip.newKinDat(jpsi.fitResult());
+     psip.doTheFit();
+
+     if( (psip.chisqVtx()>0) && (psip.chisqFit()>0) ) {
+       psip_pipi_vtxchisq = psip.chisqVtx();
+       psip_pipi_fitchisq = psip.chisqFit();
+
+       //   cerr << jpsi4v.m() << " " << pipi_recmass << endl;
+
+       PiPiJpsi4V[0] = jpsi.fitResult().energy();
+       PiPiJpsi4V[1] = jpsi.fitResult().px();
+       PiPiJpsi4V[2] = jpsi.fitResult().py();
+       PiPiJpsi4V[3] = jpsi.fitResult().pz();      
+
+       PiPi4V[0] = pipi.fitResult().energy();
+       PiPi4V[1] = pipi.fitResult().px();
+       PiPi4V[2] = pipi.fitResult().py();
+       PiPi4V[3] = pipi.fitResult().pz();      
+       /*
+       if( pion_tracks[0]->charge() > 0 ) {
+	 cerr << (pion_tracks[0]->lorentzMomentum() + pion_tracks[1]->lorentzMomentum()).m() << " "
+	      << pion_tracks[0]->px() << " " << pion_tracks[0]->py() << " " << pion_tracks[0]->pz() << " " 
+	      << pion_tracks[1]->px() << " " << pion_tracks[1]->py() << " " << pion_tracks[1]->pz() << endl;
+       } else {
+	 cerr << (pion_tracks[0]->lorentzMomentum() + pion_tracks[1]->lorentzMomentum()).m() << " "
+	      << pion_tracks[1]->px() << " " << pion_tracks[1]->py() << " " << pion_tracks[1]->pz() << " " 
+	      << pion_tracks[0]->px() << " " << pion_tracks[0]->py() << " " << pion_tracks[0]->pz() << endl;
+       }
+       */
+       // Fill ntuple
+       ntVal[k_NShower] = unmatchedShowers;
+       ntVal[k_NTrack] = numFit;
+       ntVal[k_TCharge] = tCharge;
+       ntVal[k_NPi0] = numPi0;
+       ntVal[k_NEta] = numEta;
+       
+       ntVal[k_RunNum] = the_run;
+       ntVal[k_EvtNum] = the_evt;
+       
+       ntVal[k_NeutE] = neutralEnergy;
+
+
+       ntVal[k_pipi_Jpsi_E] = PiPiJpsi4V[0];
+       ntVal[k_pipi_Jpsi_Px] = PiPiJpsi4V[1];
+       ntVal[k_pipi_Jpsi_Py] = PiPiJpsi4V[2];
+       ntVal[k_pipi_Jpsi_Pz] = PiPiJpsi4V[3];
+
+
+   ntVal[k_pipi_E] = PiPi4V[0];
+   ntVal[k_pipi_Px] = PiPi4V[1];
+   ntVal[k_pipi_Py] = PiPi4V[2];
+   ntVal[k_pipi_Pz] = PiPi4V[3];
+
+
+   ntVal[k_pipi_VtxChisq] = pipi_vtxchisq;
+   ntVal[k_pipi_FitChisq] = pipi_fitchisq;
+   ntVal[k_pipi_Jpsi_VtxChisq] = jpsi_pipi_vtxchisq;
+   ntVal[k_pipi_Jpsi_FitChisq] = jpsi_pipi_fitchisq;
+   ntVal[k_pipi_Psip_VtxChisq] = psip_pipi_vtxchisq;
+   ntVal[k_pipi_Psip_FitChisq] = psip_pipi_fitchisq;
+
+
+   // Photon Quantities
+   ntVal[k_Energy_1] = E[0];
+   ntVal[k_Barrel_1] = Barrel[0];
+   ntVal[k_Theta_1] = Theta[0];
+   ntVal[k_Phi_1] = Phi[0];
+   ntVal[k_Energy_2] = E[1];
+   ntVal[k_Barrel_2] = Barrel[1];
+   ntVal[k_Theta_2] = Theta[1];
+   ntVal[k_Phi_2] = Phi[1];
+   ntVal[k_Energy_3] = E[2];
+   ntVal[k_Barrel_3] = Barrel[2];
+   ntVal[k_Theta_3] = Theta[2];
+   ntVal[k_Phi_3] = Phi[2];
+   ntVal[k_Energy_4] = E[3];
+   ntVal[k_Barrel_4] = Barrel[3];
+   ntVal[k_Theta_4] = Theta[3];
+   ntVal[k_Phi_4] = Phi[3];
+   ntVal[k_Energy_5] = E[4];
+   ntVal[k_Barrel_5] = Barrel[4];
+   ntVal[k_Theta_5] = Theta[4];
+   ntVal[k_Phi_5] = Phi[4];
+   ntVal[k_Energy_6] = E[5];
+   ntVal[k_Barrel_6] = Barrel[5];
+   ntVal[k_Theta_6] = Theta[5];
+   ntVal[k_Phi_6] = Phi[5];
+
+   // track data
+   ntVal[k_TE_1] = PE[muon_ids[0]];
+   ntVal[k_Px_1] = PPx[muon_ids[0]];
+   ntVal[k_Py_1] = PPy[muon_ids[0]];
+   ntVal[k_Pz_1] = PPz[muon_ids[0]];
+   ntVal[k_ETE_1] = EE[muon_ids[0]];
+   ntVal[k_EPx_1] = EPx[muon_ids[0]];
+   ntVal[k_EPy_1] = EPy[muon_ids[0]];
+   ntVal[k_EPz_1] = EPz[muon_ids[0]];
+   ntVal[k_MuTE_1] = MuE[muon_ids[0]];
+   ntVal[k_MuPx_1] = MuPx[muon_ids[0]];
+   ntVal[k_MuPy_1] = MuPy[muon_ids[0]];
+   ntVal[k_MuPz_1] = MuPz[muon_ids[0]];
+   ntVal[k_Chg_1] = Charge[muon_ids[0]];
+   ntVal[k_DOCA_1] = DOCA[muon_ids[0]];
+   ntVal[k_Z0_1] = Z0[muon_ids[0]];
+   ntVal[k_ReChiSq_1] = ReChiSq[muon_ids[0]];
+   ntVal[k_EID_1] = EID[muon_ids[0]]; 
+   ntVal[k_MuID_1] = MUID[muon_ids[0]];
+   ntVal[k_LLpi_1] = PILL[muon_ids[0]];
+   ntVal[k_LLk_1] = KLL[muon_ids[0]];
+   ntVal[k_LLp_1] = PLL[muon_ids[0]];
+   ntVal[k_SigPi_1] = PISIG[muon_ids[0]];
+   ntVal[k_SigK_1] = KSIG[muon_ids[0]];
+   ntVal[k_SigP_1] = PSIG[muon_ids[0]];
+   ntVal[k_DL_pip_1] = DLPIP[muon_ids[0]];
+   ntVal[k_DL_pik_1] = DLPIK[muon_ids[0]];
+   ntVal[k_EP_1] = EP[muon_ids[0]];
+   ntVal[k_DptMu_1] = MuDepth[muon_ids[0]];
+   ntVal[k_TE_2] = PE[muon_ids[1]];
+   ntVal[k_Px_2] = PPx[muon_ids[1]];
+   ntVal[k_Py_2] = PPy[muon_ids[1]];
+   ntVal[k_Pz_2] = PPz[muon_ids[1]];
+   ntVal[k_ETE_2] = EE[muon_ids[1]];
+   ntVal[k_EPx_2] = EPx[muon_ids[1]];
+   ntVal[k_EPy_2] = EPy[muon_ids[1]];
+   ntVal[k_EPz_2] = EPz[muon_ids[1]];
+   ntVal[k_MuTE_2] = MuE[muon_ids[1]];
+   ntVal[k_MuPx_2] = MuPx[muon_ids[1]];
+   ntVal[k_MuPy_2] = MuPy[muon_ids[1]];
+   ntVal[k_MuPz_2] = MuPz[muon_ids[1]];
+   ntVal[k_Chg_2] = Charge[muon_ids[1]];
+   ntVal[k_DOCA_2] = DOCA[muon_ids[1]];
+   ntVal[k_Z0_2] = Z0[muon_ids[1]];
+   ntVal[k_ReChiSq_2] = ReChiSq[muon_ids[1]];
+   ntVal[k_EID_2] = EID[muon_ids[1]]; 
+   ntVal[k_MuID_2] = MUID[muon_ids[1]];
+   ntVal[k_LLpi_2] = PILL[muon_ids[1]];
+   ntVal[k_LLk_2] = KLL[muon_ids[1]];
+   ntVal[k_LLp_2] = PLL[muon_ids[1]];
+   ntVal[k_SigPi_2] = PISIG[muon_ids[1]];
+   ntVal[k_SigK_2] = KSIG[muon_ids[1]];
+   ntVal[k_SigP_2] = PSIG[muon_ids[1]];
+   ntVal[k_DL_pip_2] = DLPIP[muon_ids[1]];
+   ntVal[k_DL_pik_2] = DLPIK[muon_ids[1]];
+   ntVal[k_EP_2] = EP[muon_ids[1]];
+   ntVal[k_DptMu_2] = MuDepth[muon_ids[1]];
+   ntVal[k_TE_3] = PE[pion_ids[0]];
+   ntVal[k_Px_3] = PPx[pion_ids[0]];
+   ntVal[k_Py_3] = PPy[pion_ids[0]];
+   ntVal[k_Pz_3] = PPz[pion_ids[0]];
+   ntVal[k_ETE_3] = EE[pion_ids[0]];
+   ntVal[k_EPx_3] = EPx[pion_ids[0]];
+   ntVal[k_EPy_3] = EPy[pion_ids[0]];
+   ntVal[k_EPz_3] = EPz[pion_ids[0]];
+   ntVal[k_MuTE_3] = MuE[pion_ids[0]];
+   ntVal[k_MuPx_3] = MuPx[pion_ids[0]];
+   ntVal[k_MuPy_3] = MuPy[pion_ids[0]];
+   ntVal[k_MuPz_3] = MuPz[pion_ids[0]];
+   ntVal[k_Chg_3] = Charge[pion_ids[0]];
+   ntVal[k_DOCA_3] = DOCA[pion_ids[0]];
+   ntVal[k_Z0_3] = Z0[pion_ids[0]];
+   ntVal[k_ReChiSq_3] = ReChiSq[pion_ids[0]];
+   ntVal[k_EID_3] = EID[pion_ids[0]]; 
+   ntVal[k_MuID_3] = MUID[pion_ids[0]];
+   ntVal[k_LLpi_3] = PILL[pion_ids[0]];
+   ntVal[k_LLk_3] = KLL[pion_ids[0]];
+   ntVal[k_LLp_3] = PLL[pion_ids[0]];
+   ntVal[k_SigPi_3] = PISIG[pion_ids[0]];
+   ntVal[k_SigK_3] = KSIG[pion_ids[0]];
+   ntVal[k_SigP_3] = PSIG[pion_ids[0]];
+   ntVal[k_DL_pip_3] = DLPIP[pion_ids[0]];
+   ntVal[k_DL_pik_3] = DLPIK[pion_ids[0]];
+   ntVal[k_EP_3] = EP[pion_ids[0]];
+   ntVal[k_DptMu_3] = MuDepth[pion_ids[0]];
+   ntVal[k_TE_4] = PE[pion_ids[1]];
+   ntVal[k_Px_4] = PPx[pion_ids[1]];
+   ntVal[k_Py_4] = PPy[pion_ids[1]];
+   ntVal[k_Pz_4] = PPz[pion_ids[1]];
+   ntVal[k_ETE_4] = EE[pion_ids[1]];
+   ntVal[k_EPx_4] = EPx[pion_ids[1]];
+   ntVal[k_EPy_4] = EPy[pion_ids[1]];
+   ntVal[k_EPz_4] = EPz[pion_ids[1]];
+   ntVal[k_MuTE_4] = MuE[pion_ids[1]];
+   ntVal[k_MuPx_4] = MuPx[pion_ids[1]];
+   ntVal[k_MuPy_4] = MuPy[pion_ids[1]];
+   ntVal[k_MuPz_4] = MuPz[pion_ids[1]];
+   ntVal[k_Chg_4] = Charge[pion_ids[1]];
+   ntVal[k_DOCA_4] = DOCA[pion_ids[1]];
+   ntVal[k_Z0_4] = Z0[pion_ids[1]];
+   ntVal[k_ReChiSq_4] = ReChiSq[pion_ids[1]];
+   ntVal[k_EID_4] = EID[pion_ids[1]]; 
+   ntVal[k_MuID_4] = MUID[pion_ids[1]];
+   ntVal[k_LLpi_4] = PILL[pion_ids[1]];
+   ntVal[k_LLk_4] = KLL[pion_ids[1]];
+   ntVal[k_LLp_4] = PLL[pion_ids[1]];
+   ntVal[k_SigPi_4] = PISIG[pion_ids[1]];
+   ntVal[k_SigK_4] = KSIG[pion_ids[1]];
+   ntVal[k_SigP_4] = PSIG[pion_ids[1]];
+   ntVal[k_DL_pip_4] = DLPIP[pion_ids[1]];
+   ntVal[k_DL_pik_4] = DLPIK[pion_ids[1]];
+   ntVal[k_EP_4] = EP[pion_ids[1]];
+   ntVal[k_DptMu_4] = MuDepth[pion_ids[1]];
+
+   m_LEGammaNt->fill(ntVal);
+
+   
+     }
+   }
+   
+/***/
+
+   return ActionBase::kPassed;
+}
+
+
+ActionBase::ActionResult
+JpsiPiPiProc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   if(spot.valid()) {
+      m_beam_x = spot->center().x();
+      m_beam_y = spot->center().y();
+      m_beam_z = spot->center().z();
+   } else {
+      m_beam_x = 0.;
+      m_beam_y = 0.;
+      m_beam_z = 0.;
+   }     
+
+   report( DEBUG, kFacilityString ) <<
+      "BeamSpot x,y,z = " <<
+      m_beam_x << ", " <<
+      m_beam_y << ", " <<
+      m_beam_z << endl ;
+
+   return ActionBase::kPassed;
+}
+
+
+/*
+ActionBase::ActionResult
+JpsiPiPiProc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+
+double JpsiPiPiProc::calcDOCA( double iD,
+		       	     double iPhi )
+{
+   double dx ( -iD*sin(iPhi) - m_beam_x ) ;
+   double dy (  iD*cos(iPhi) - m_beam_y ) ;
+   double doca = sqrt( dx*dx + dy*dy ) ;
+
+   if(isnan(doca))
+      return -2.;
+   else if(doca < 1e-5)
+      return 1e-5;
+   else
+      return doca;
+}
+
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

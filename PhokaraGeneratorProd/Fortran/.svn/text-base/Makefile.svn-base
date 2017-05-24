@@ -1,0 +1,15 @@
+phokhara:
+	gcc -c ranlxd.c
+	gcc -c ranlux_fort.c
+	g77 -c phokhara_6.0.f
+	g77 -o phokhara_6.0.exe phokhara_6.0.o ranlux_fort.o ranlxd.o
+testlxf:
+	gcc -c ranlxd.c
+	gcc -c ranlux_fort.c
+	g77 -c testlxf.for
+	g77 -o testlxf.exe testlxf.o ranlux_fort.o ranlxd.o
+seed_prod:
+	gcc -c ranlxd.c
+	gcc -c ranlux_fort.c
+	g77 -c seed_prod.for
+	g77 -o seed_prod.exe seed_prod.o ranlux_fort.o ranlxd.o

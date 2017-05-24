@@ -1,0 +1,339 @@
+// -*- C++ -*-
+//
+// Package:     DumpDecayTreeProc
+// Module:      DumpDecayTreeProc
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      Hanna Mahlke-Krueger
+// Created:     Mon Jun 18 16:02:36 EDT 2001
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "DumpDecayTreeProc/DumpDecayTreeProc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "MCInfo/MCDecayTree/MCDecayTree.h"
+#include "MCInfo/MCDecayTree/MCParticle.h"
+#include "MCInfo/MCDecayTree/MCVertex.h"
+#include "MCInfo/MCParticleProperty/MCParticleProperty.h"
+
+#include "MCBeam/MCBeamParameters.h"
+#include "CesrCleoComm/CesrCrossingAngle.h"
+
+#include "CLHEP/Vector/LorentzRotation.h"
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+
+
+
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.DumpDecayTreeProc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.17 2000/12/04 19:11:11 cdj Exp $";
+static const char* const kTagString = "$Name: v03_06_00 $";
+
+//
+// static data member definitions
+//
+
+//
+// constructors and destructor
+//
+DumpDecayTreeProc::DumpDecayTreeProc( void )               // anal1
+   : Processor( "DumpDecayTreeProc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &DumpDecayTreeProc::event,    Stream::kEvent );
+   //bind( &DumpDecayTreeProc::beginRun, Stream::kBeginRun );
+   //bind( &DumpDecayTreeProc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+}
+
+DumpDecayTreeProc::~DumpDecayTreeProc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+DumpDecayTreeProc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+DumpDecayTreeProc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+// ---------------- standard place to book histograms ---------------
+void
+DumpDecayTreeProc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   h_e = iHistoManager.histogram("e", 400, 0.5, 2.5);   
+   h_pimass = iHistoManager.histogram("pimass", 600, 0., 3.);
+   h_mumass = iHistoManager.histogram("mumass", 600, 0., 3.);
+
+   h_pp_costh = iHistoManager.histogram("pp_costh", 100, 0, 1.);
+   h_np_costh = iHistoManager.histogram("np_costh", 100, 0, 1.);
+   h_pi_costh = iHistoManager.histogram("pi_costh", 100, 0, 1.);
+   h_pmu_costh = iHistoManager.histogram("pmu_costh", 100, 0, 1.);
+   h_nmu_costh = iHistoManager.histogram("nmu_costh", 100, 0, 1.);
+   h_mu_costh = iHistoManager.histogram("mu_costh", 100, 0, 1.);
+
+   h_e_costh = iHistoManager.histogram("e_costh", 100, 0, 1.);
+   h_epp_costh = iHistoManager.histogram("epp_costh", 100, 0, 1., 100, 0, 1.);
+   h_enp_costh = iHistoManager.histogram("enp_costh", 100, 0, 1., 100, 0, 1.);
+   h_epi_costh = iHistoManager.histogram("epi_costh", 100, 0, 1., 100, 0, 1.);
+   h_epmu_costh = iHistoManager.histogram("epmu_costh", 100, 0, 1., 100, 0, 1.);
+   h_enmu_costh = iHistoManager.histogram("enmu_costh", 100, 0, 1., 100, 0, 1.);
+   h_emu_costh = iHistoManager.histogram("emu_costh", 100, 0, 1., 100, 0, 1.);
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+DumpDecayTreeProc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   // Let's extract the tree (no usage tag means we get the CLEOG tree)
+   FAItem< MCDecayTree > decayTree;
+
+///////////////////////////////////////////////////////////////////
+// NOTE: The first extract line is for dumping the cleog-level 
+//       decay tree, the later is for dumping the generator-level
+//       decay tree.
+
+//   extract(iFrame.record(Stream::kEvent), decayTree);
+
+   extract(iFrame.record(Stream::kEvent), decayTree, "Generator" );
+
+///////////////////////////////////////////////////////////////////
+
+
+
+ for(MCDecayTree::const_pIterator it = decayTree->pBegin();
+       it != decayTree->pEnd(); it++) {
+
+   double e_costh = -1000;
+
+   if( ( it->properties().PDGId() == 22 ) ) {
+         const MCVertex* vphoVtx = it->productionVertex();
+         const MCParticle& parent = (*vphoVtx).parent();
+
+      if ((it->energy()>=1.5) && (parent.properties().PDGId() == 91)){
+	 h_e->fill(it->energy());      
+         e_costh = fabs(( it->pz() ) / ( it->pmag())) ;
+         h_e_costh->fill(e_costh);
+
+         for(MCDecayTree::const_pIterator it2 = decayTree->pBegin();
+               it2 != decayTree->pEnd(); it2++) {
+           if((it2->properties().PDGId() == 211) && (e_costh > -900)){
+              double e_pp_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_epp_costh->fill(e_costh,e_pp_costh);
+              h_pp_costh->fill(e_pp_costh);
+
+           }
+           if((it2->properties().PDGId() == -211) && (e_costh > -900)){
+              double e_np_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_enp_costh->fill(e_costh,e_np_costh);
+              h_np_costh->fill(e_np_costh);
+           }
+           if(((it2->properties().PDGId() == 211)||(it2->properties().PDGId() == -211)) && (e_costh > -900)){
+              double e_pi_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_epi_costh->fill(e_costh,e_pi_costh);
+              h_pi_costh->fill(e_pi_costh);
+
+           }
+           if((it2->properties().PDGId() == -13) && (e_costh > -900)){
+              double e_pmu_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_epmu_costh->fill(e_costh,e_pmu_costh);
+              h_pmu_costh->fill(e_pmu_costh);
+           }
+           if((it2->properties().PDGId() == 13) && (e_costh > -900)){
+              double e_nmu_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_enmu_costh->fill(e_costh,e_nmu_costh);
+              h_nmu_costh->fill(e_nmu_costh);
+           }
+           if(((it2->properties().PDGId() == 13)||(it2->properties().PDGId() == -13)) && (e_costh > -900)){
+              double e_mu_costh = fabs(( it2->pz() ) / ( it2->pmag())) ;
+              h_emu_costh->fill(e_costh,e_mu_costh);
+              h_mu_costh->fill(e_mu_costh);
+           }
+
+          if( ( it2->properties().PDGId() == 211 ) ) {
+            for(MCDecayTree::const_pIterator it3 = decayTree->pBegin();
+               it3 != decayTree->pEnd(); it3++) {
+              if( ( it3->properties().PDGId() == -211 ) ) {
+
+                double pp_px = it2->px();
+                double pp_py = it2->py();
+                double pp_pz = it2->pz();
+                double pp_e  = it2->energy();
+                double np_px = it3->px();
+                double np_py = it3->py();
+                double np_pz = it3->pz();
+                double np_e  = it3->energy();
+
+                double pimass = sqrt(fabs(pow((pp_e+np_e),2) - pow((pp_px+np_px),2)
+                                         - pow((pp_py+np_py),2) - pow((pp_pz+np_pz),2) ));
+                h_pimass->fill(pimass);
+             }
+           }
+         }
+
+         if( ( it2->properties().PDGId() == -13 ) ) {
+           for(MCDecayTree::const_pIterator it3 = decayTree->pBegin();
+             it3 != decayTree->pEnd(); it3++) {
+            if( ( it3->properties().PDGId() == 13 ) ) {
+
+               double pmu_px = it2->px();
+               double pmu_py = it2->py();
+               double pmu_pz = it2->pz();
+               double pmu_e  = it2->energy();
+               double nmu_px = it3->px();
+               double nmu_py = it3->py();
+               double nmu_pz = it3->pz();
+               double nmu_e  = it3->energy();
+
+               double mumass = sqrt(fabs(pow((pmu_e+nmu_e),2) - pow((pmu_px+nmu_px),2)
+                                     - pow((pmu_py+nmu_py),2) - pow((pmu_pz+nmu_pz),2) ));
+               h_mumass->fill(mumass);
+            }
+          }
+        }
+     }
+   }
+  }
+ }
+
+//   report(INFO, kFacilityString) << "About to dump decay tree" << endl;
+//   report(INFO, kFacilityString) << mcDecayTree << endl;
+
+
+/*
+ for(MCDecayTree::const_pIterator it = decayTree->pBegin();
+       it != decayTree->pEnd(); it++) {
+   if( ( it->properties().PDGId() == -13 ) ) {
+
+     for(MCDecayTree::const_pIterator it2 = decayTree->pBegin();
+             it2 != decayTree->pEnd(); it2++) {
+       if( ( it2->properties().PDGId() == 13 ) ) {
+
+         double pmu_px = it->px();
+         double pmu_py = it->py();
+         double pmu_pz = it->pz();
+         double pmu_e  = it->energy();
+         double nmu_px = it2->px();
+         double nmu_py = it2->py();
+         double nmu_pz = it2->pz();
+         double nmu_e  = it2->energy();
+
+         double mumass = sqrt(fabs(pow((pmu_e+nmu_e),2) - pow((pmu_px+nmu_px),2)
+                                     - pow((pmu_py+nmu_py),2) - pow((pmu_pz+nmu_pz),2) ));
+         h_mumass->fill(mumass);
+      }
+    }
+  }
+ }
+
+*/
+
+
+
+   return ActionBase::kPassed;
+}
+
+/*
+ActionBase::ActionResult
+DumpDecayTreeProc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+/*
+ActionBase::ActionResult
+DumpDecayTreeProc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//
+

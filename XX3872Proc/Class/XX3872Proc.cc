@@ -1,0 +1,667 @@
+// -*- C++ -*-
+//
+// Package:     XX3872Proc
+// Module:      XX3872Proc
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      pts/13
+// Created:     Fri Feb  4 10:21:00 CST 2011
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "XX3872Proc/XX3872Proc.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+#include "HistogramInterface/HINtupleVarNames.h"
+#include "HistogramInterface/HINtupleArray.h"
+#include "HistogramInterface/HIHist1D.h"
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+#include "Navigation/NavShowerServer.h"
+#include "C3ccProd/CcFortranShowerCorrector.h"
+
+//I added the following at the suggestion of the NavShower web page
+#include "Navigation/NavConReg.h"
+#include "KinematicTrajectory/KTKinematicData.h"
+#include "Navigation/NavTkShMatch.h"
+#include "C3cc/CcAssignedEnergyHit.h"
+
+#include "Navigation/NavTrack.h"
+#include "TrackRoot/TRHelixFit.h"
+#include "TrackRoot/TRTrackFitQuality.h"
+#include "TrackRoot/TRSeedTrackQuality.h"
+#include "TrackDelivery/TDKinematicFit.h"
+#include "Navigation/NavElecId.h"
+
+#include "FitEvt/FitEvtSettings.h"
+#include "FitEvt/FitEvt.h"
+#include "BeamEnergy/BeamEnergy.h"
+#include "MagField/MagneticField.h"
+#include "MagField/MFFieldMap.h"
+#include "BeamSpot/BeamSpot.h"
+
+#include "CleoDB/DBEventHeader.h"
+#include "TriggerData/TriggerData.h"
+#include "TriggerL1Data/TriggerL1Data.h"
+#include "Level4Proc/Level4Decision.h"
+
+//RICH example
+#include "Navigation/NavRich.h"
+//Dedx example
+#include "DedxInfo/DedxInfo.h"
+
+
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.XX3872Proc" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.41 2006/02/08 19:38:02 wsun Exp $";
+static const char* const kTagString = "$Name: v07_03_00 $";
+
+//
+// static data member definitions
+//
+
+
+
+//
+// constructors and destructor
+//
+XX3872Proc::XX3872Proc( void )               // anal1
+   : Processor( "XX3872Proc" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &XX3872Proc::event,    Stream::kEvent );
+   bind( &XX3872Proc::beginRun, Stream::kBeginRun );
+   //bind( &XX3872Proc::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+XX3872Proc::~XX3872Proc()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+XX3872Proc::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+XX3872Proc::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+
+enum {
+chisqv,chisqf,         //chisq of 4C fit
+e,th,phi,e925,        // unfitted photon energy
+fe,fth,fphi,         // fitted photon energy
+eop1,eop2,eop3,eop4,me1,me2,me3,me4,dedx1,dedx2,dedx3,dedx4,
+trte1,trpx1,trpy1,trpz1,trte2,trpx2,trpy2,trpz2,
+trte3,trpx3,trpy3,trpz3,trte4,trpx4,trpy4,trpz4,
+ftrte1,ftrpx1,ftrpy1,ftrpz1,ftrte2,ftrpx2,ftrpy2,ftrpz2,
+ftrte3,ftrpx3,ftrpy3,ftrpz3,ftrte4,ftrpx4,ftrpy4,ftrpz4,
+id1,id2,id3,id4,charge1,charge2,charge3,charge4,
+passed1,passed2,passed3,passed4,
+peak1,peak2,peak3,peak4,
+kVarNum};
+
+
+
+void
+XX3872Proc::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+
+   HINtupleVarNames ntupleNames(kVarNum);
+
+   ntupleNames.addVar(chisqv,       "chisqv");
+   ntupleNames.addVar(chisqf,       "chisqf");
+   ntupleNames.addVar(e,            "e");
+   ntupleNames.addVar(th,           "th");
+   ntupleNames.addVar(phi,          "phi");
+   ntupleNames.addVar(e925,         "e925");
+   ntupleNames.addVar(fe,           "fe");
+   ntupleNames.addVar(fth,          "fth");
+   ntupleNames.addVar(fphi,         "fphi");
+   ntupleNames.addVar(eop1,         "eop1");
+   ntupleNames.addVar(eop2,         "eop2");
+   ntupleNames.addVar(eop3,         "eop3");
+   ntupleNames.addVar(eop4,         "eop4");
+   ntupleNames.addVar(me1,          "me1");
+   ntupleNames.addVar(me2,          "me2");
+   ntupleNames.addVar(me3,          "me3");
+   ntupleNames.addVar(me4,          "me4");
+   ntupleNames.addVar(dedx1,        "dedx1");
+   ntupleNames.addVar(dedx2,        "dedx2");
+   ntupleNames.addVar(dedx3,        "dedx3");
+   ntupleNames.addVar(dedx4,        "dedx4");
+
+   ntupleNames.addVar(trte1,        "trte1");
+   ntupleNames.addVar(trpx1,        "trpx1");
+   ntupleNames.addVar(trpy1,        "trpy1");
+   ntupleNames.addVar(trpz1,        "trpz1");
+   ntupleNames.addVar(trte2,        "trte2");
+   ntupleNames.addVar(trpx2,        "trpx2");
+   ntupleNames.addVar(trpy2,        "trpy2");
+   ntupleNames.addVar(trpz2,        "trpz2");
+   ntupleNames.addVar(trte3,        "trte3");
+   ntupleNames.addVar(trpx3,        "trpx3");
+   ntupleNames.addVar(trpy3,        "trpy3");
+   ntupleNames.addVar(trpz3,        "trpz3");
+   ntupleNames.addVar(trte4,        "trte4");
+   ntupleNames.addVar(trpx4,        "trpx4");
+   ntupleNames.addVar(trpy4,        "trpy4");
+   ntupleNames.addVar(trpz4,        "trpz4");
+   ntupleNames.addVar(ftrte1,       "ftrte1");
+   ntupleNames.addVar(ftrpx1,       "ftrpx1");
+   ntupleNames.addVar(ftrpy1,       "ftrpy1");
+   ntupleNames.addVar(ftrpz1,       "ftrpz1");
+   ntupleNames.addVar(ftrte2,       "ftrte2");
+   ntupleNames.addVar(ftrpx2,       "ftrpx2");
+   ntupleNames.addVar(ftrpy2,       "ftrpy2");
+   ntupleNames.addVar(ftrpz2,       "ftrpz2");
+   ntupleNames.addVar(ftrte3,       "ftrte3");
+   ntupleNames.addVar(ftrpx3,       "ftrpx3");
+   ntupleNames.addVar(ftrpy3,       "ftrpy3");
+   ntupleNames.addVar(ftrpz3,       "ftrpz3");
+   ntupleNames.addVar(ftrte4,       "ftrte4");
+   ntupleNames.addVar(ftrpx4,       "ftrpx4");
+   ntupleNames.addVar(ftrpy4,       "ftrpy4");
+   ntupleNames.addVar(ftrpz4,       "ftrpz4");
+   ntupleNames.addVar(id1,          "id1");
+   ntupleNames.addVar(id2,          "id2");
+   ntupleNames.addVar(id3,          "id3");
+   ntupleNames.addVar(id4,          "id4");
+   ntupleNames.addVar(charge1,      "charge1");
+   ntupleNames.addVar(charge2,      "charge2");
+   ntupleNames.addVar(charge3,      "charge3");
+   ntupleNames.addVar(charge4,      "charge4");
+   ntupleNames.addVar(passed1,      "passed1");
+   ntupleNames.addVar(passed2,      "passed2");
+   ntupleNames.addVar(passed3,      "passed3");
+   ntupleNames.addVar(passed4,      "passed4");
+   ntupleNames.addVar(peak1,        "peak1");
+   ntupleNames.addVar(peak2,        "peak2");
+   ntupleNames.addVar(peak3,        "peak3");
+   ntupleNames.addVar(peak4,        "peak4");
+
+   m_showerTuple = iHistoManager.ntuple(10,"tuple", kVarNum, 10000, ntupleNames.names());
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+XX3872Proc::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   const int kMaxTrack = 4;
+
+   double ChisqV = 1000000.;
+   double ChisqF = 1000000.;
+   double TempChisqV = 1000000.;
+   double TempChisqF = 1000000.;
+
+   double E = 0.;
+   double Theta = 0.;
+   double Phi = 0.;
+   double E925 = 0.;
+   double FE = 0.;
+   double FTheta = 0.;
+   double FPhi = 0.;
+
+   double ME[kMaxTrack] = {0.,0.,0.,0.};
+   double EOP[kMaxTrack] = {0.,0.,0.,0};
+
+   double PE[kMaxTrack] = {0.,0.,0.,0.};
+   double PX[kMaxTrack] = {0.,0.,0.,0.};
+   double PY[kMaxTrack] = {0.,0.,0.,0.};
+   double PZ[kMaxTrack] = {0.,0.,0.,0.};
+   double FPE[kMaxTrack] = {0.,0.,0.,0.};
+   double FPX[kMaxTrack] = {0.,0.,0.,0.};
+   double FPY[kMaxTrack] = {0.,0.,0.,0.};
+   double FPZ[kMaxTrack] = {0.,0.,0.,0.};
+
+   int CHARGE[kMaxTrack] = {100,100,100,100};
+   int ID[kMaxTrack] = {-100,-100,-100,-100};  //0:pi, 1:e, 2: mu
+   double DEDX[kMaxTrack] = {10000.,10000.,10000.,10000.};
+
+   double PASSED1 = 0;
+   double PASSED2 = 0;
+   double PASSED3 = 0;
+   double PASSED4 = 0;
+   double PEAK1 = 0;
+   double PEAK2 = 0;
+   double PEAK3 = 0;
+   double PEAK4 = 0;
+
+
+   float tuple[kVarNum];
+
+
+///////////////////////////////////// # of showers >= 1 ////////////////////////////////
+
+   FATable< NavShower > showerTable;
+   extract( iFrame.record( Stream::kEvent ) , showerTable, "GoodThings" );
+
+   if(showerTable.size() < 1)
+      return ActionBase::kFailed;
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+   FATable< NavShower >::const_iterator showerEnd = showerTable.end();
+
+//////////////////////////////////// # of tracks == 4 /////////////////////////////////
+
+
+   FATable< NavTrack > trackTable;
+   extract( iFrame.record( Stream::kEvent ) , trackTable, "GoodThings" );
+
+   if(trackTable.size() != kMaxTrack)
+       return ActionBase::kFailed;
+
+   FATable< NavTrack >::const_iterator trackTableBegin = trackTable.begin();
+   FATable< NavTrack >::const_iterator trackTableEnd = trackTable.end();
+
+/////////////////////////////////// net charge == 0 ////////////////////////////////////
+
+   int unmatchedtracks = 0;
+   int charge_sum = 0;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackTableBegin;
+         trackItr != trackTableEnd ;
+         ++trackItr )
+   {
+      int i = unmatchedtracks++;
+      CHARGE[i]=(*trackItr).pionFit()->charge();
+      PE[i]=(*trackItr).pionFit()->lorentzMomentum().e();
+      PX[i]=(*trackItr).pionFit()->px();
+      PY[i]=(*trackItr).pionFit()->py();
+      PZ[i]=(*trackItr).pionFit()->pz();
+      charge_sum += CHARGE[i];
+   }
+
+   if(charge_sum != 0)
+       return ActionBase::kFailed;
+
+   PASSED1 = 1;
+   PEAK1 = sqrt(pow((PE[0]+PE[1]+PE[2]+PE[3]),2)-pow((PX[0]+PX[1]+PX[2]+PX[3]),2)-pow((PY[0]+PY[1]+PY[2]+PY[3]),2)-pow((PZ[0]+PZ[1]+PZ[2]+PZ[3]),2));
+
+///////////////////////////////////////////////////////////////////////////////////////////
+/////// the total number of ntuple gives the efficiency of the above 3 cuts ///////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////
+/////////////////// tell pipi from ee or mumu using their energy  ////////////////////////
+/////////////////// pipi: |e| < 0.5 , mumu or ee: |e| > 0.5 //////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
+
+   unmatchedtracks = 0;
+   int id_sum = 0;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackTableBegin;
+         trackItr != trackTableEnd ;
+         ++trackItr )
+   {
+      int i = unmatchedtracks++;
+//      PE[i]=(*trackItr).pionFit()->lorentzMomentum().e();
+
+      if(trackItr->trackShowerMatch().valid())
+         ME[i] = trackItr->trackShowerMatch()->matchedEnergy();
+
+      EOP[i] = trackItr->elecId().eOverP();
+
+      FAItem<DedxInfo> the_dedx = (*trackItr).dedxInfo();
+
+      if(PE[i] < 0.5) {
+        FAItem<TDKinematicFit> pionFit = (*trackItr).pionFit();
+        if( (pionFit.valid()) && (the_dedx.valid()) )  {
+          ID[i] = 0;
+          PE[i]=pionFit->energy();
+          PX[i]=pionFit->px();
+          PY[i]=pionFit->py();
+          PZ[i]=pionFit->pz();
+          DEDX[i]=the_dedx->piSigma();
+        }
+      }
+      else {
+        if(EOP[i] > 0.8 && EOP[i] < 1.2) {
+          FAItem<TDKinematicFit> electronFit = (*trackItr).electronFit();
+          if( (electronFit.valid()) && (the_dedx.valid()) )  {
+            ID[i] = 1;
+            PE[i]=electronFit->energy();
+            PX[i]=electronFit->px();
+            PY[i]=electronFit->py();
+            PZ[i]=electronFit->pz();
+            DEDX[i]=the_dedx->eSigma();
+          }
+        }
+        else if(EOP[i] < 0.8) {
+          FAItem<TDKinematicFit> muonFit = (*trackItr).muonFit();
+          if( (muonFit.valid()) && (the_dedx.valid()) )  {
+            ID[i] = 2;
+            PE[i]=muonFit->energy();
+            PX[i]=muonFit->px();
+            PY[i]=muonFit->py();
+            PZ[i]=muonFit->pz();
+            DEDX[i]=the_dedx->muSigma();
+          }
+        }
+      }
+
+      id_sum += ID[i];
+   }
+   if(id_sum > 0) {
+     PASSED2 = 1;
+     PEAK2 = sqrt(pow((PE[0]+PE[1]+PE[2]+PE[3]),2)-pow((PX[0]+PX[1]+PX[2]+PX[3]),2)-pow((PY[0]+PY[1]+PY[2]+PY[3]),2)-pow((PZ[0]+PZ[1]+PZ[2]+PZ[3]),2));
+   }
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////// set cut |m(mumu or ee) - 3.097| < 100 MeV ///////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+   double m_Jpsi = 0;
+
+   for(int i = 0; i < 4; i++) {
+     if(ID[i] > 0) {
+       for(int j = i+1; j < 4; j++ ) {
+         if(ID[j] > 0 && ID[i] == ID[j]) {
+            m_Jpsi = sqrt(pow((PE[i]+PE[j]),2)-pow((PX[i]+PX[j]),2)-pow((PY[i]+PY[j]),2)-pow((PZ[i]+PZ[j]),2));
+            if(fabs(m_Jpsi-3.097) < 0.1)
+              PASSED3 = 1;
+         }
+       }
+     }
+   }
+
+   if(PASSED3)
+     PEAK3 = sqrt(pow((PE[0]+PE[1]+PE[2]+PE[3]),2)-pow((PX[0]+PX[1]+PX[2]+PX[3]),2)-pow((PY[0]+PY[1]+PY[2]+PY[3]),2)-pow((PZ[0]+PZ[1]+PZ[2]+PZ[3]),2));
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////// kinematic fitting  ////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+   if(PASSED3) {
+
+   FAItem<TDKinematicFit> tr[4]; 
+
+   unmatchedtracks = 0;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackTableBegin;
+         trackItr != trackTableEnd ;
+         ++trackItr )
+     {
+        int i = unmatchedtracks++;
+
+        if(ID[i] == 0)
+          tr[i] = (*trackItr).pionFit();
+        else if(ID[i] == 1)
+          tr[i] = (*trackItr).electronFit();
+        else if(ID[i] == 2)
+          tr[i] = (*trackItr).muonFit();
+     }
+
+
+   for ( FATable< NavShower >::const_iterator showerItr = showerBegin;
+         showerItr != showerEnd ;
+         ++showerItr )
+   {
+
+      if(tr[0].valid() && tr[1].valid() && tr[2].valid() && tr[3].valid()) {
+             if(showerItr->attributes().x925() < 1)  continue;
+
+      // do the fit
+
+      FitEvt pipitrtr( "Pipitrtr", FitEvt::k_P4VecCM );
+      pipitrtr.newPhoton(*showerItr);
+      pipitrtr.newTrack(*tr[0]);
+      pipitrtr.newTrack(*tr[1]);
+      pipitrtr.newTrack(*tr[2]);
+      pipitrtr.newTrack(*tr[3]);
+      pipitrtr.doTheFit();
+
+      if( (pipitrtr.chisqVtx()>0) && (pipitrtr.chisqFit()>0) ) {
+
+         HepLorentzVector vg (pipitrtr.kdFitVec()[0]->lorentzMomentum());
+         HepLorentzVector v1 (pipitrtr.kdFitVec()[1]->lorentzMomentum());
+         HepLorentzVector v2 (pipitrtr.kdFitVec()[2]->lorentzMomentum());
+         HepLorentzVector v3 (pipitrtr.kdFitVec()[3]->lorentzMomentum());
+         HepLorentzVector v4 (pipitrtr.kdFitVec()[4]->lorentzMomentum());
+
+         TempChisqV = pipitrtr.chisqVtx();
+         TempChisqF = pipitrtr.chisqFit();
+
+         if(TempChisqF < ChisqF){
+
+            ChisqV = pipitrtr.chisqVtx();
+            ChisqF = pipitrtr.chisqFit();
+
+            E = showerItr->attributes().energy();
+            Theta = showerItr->attributes().theta();
+            Phi = showerItr->attributes().phi();
+            E925 = showerItr->attributes().x925();
+
+            FE = vg.e();
+            FTheta = vg.theta();
+            FPhi = vg.phi();
+
+            FPE[0]=v1.e();
+            FPX[0]=v1.px();
+            FPY[0]=v1.py();
+            FPZ[0]=v1.pz();
+            FPE[1]=v2.e();
+            FPX[1]=v2.px();
+            FPY[1]=v2.py();
+            FPZ[1]=v2.pz();
+            FPE[2]=v3.e();
+            FPX[2]=v3.px();
+            FPY[2]=v3.py();
+            FPZ[2]=v3.pz();
+            FPE[3]=v4.e();
+            FPX[3]=v4.px();
+            FPY[3]=v4.py();
+            FPZ[3]=v4.pz();
+
+         }
+      }
+
+      if(ChisqV < 1000000 && ChisqF < 1000000) {
+         PASSED4 = 1;
+         PEAK4 = sqrt(pow((PE[0]+PE[1]+PE[2]+PE[3]),2)-pow((PX[0]+PX[1]+PX[2]+PX[3]),2)-pow((PY[0]+PY[1]+PY[2]+PY[3]),2)-pow((PZ[0]+PZ[1]+PZ[2]+PZ[3]),2));
+      }
+   }
+   }
+   }
+
+
+   tuple[chisqv] = ChisqV;
+   tuple[chisqf] = ChisqF;
+   tuple[e] = E;
+   tuple[th] = Theta;
+   tuple[phi] = Phi;
+   tuple[e925] = E925;
+   tuple[fe] = FE;
+   tuple[fth] = FTheta;
+   tuple[fphi] = FPhi;
+   tuple[eop1] = EOP[0];
+   tuple[eop2] = EOP[1];
+   tuple[eop3] = EOP[2];
+   tuple[eop4] = EOP[3];
+   tuple[me1] = ME[0];
+   tuple[me2] = ME[1];
+   tuple[me3] = ME[2];
+   tuple[me4] = ME[3];
+   tuple[dedx1] = DEDX[0];
+   tuple[dedx2] = DEDX[1];
+   tuple[dedx3] = DEDX[2];
+   tuple[dedx4] = DEDX[3];
+
+   tuple[trte1] = PE[0];
+   tuple[trpx1] = PX[0];
+   tuple[trpy1] = PY[0];
+   tuple[trpz1] = PZ[0];
+   tuple[trte2] = PE[1];
+   tuple[trpx2] = PX[1];
+   tuple[trpy2] = PY[1];
+   tuple[trpz2] = PZ[1];
+   tuple[trte3] = PE[2];
+   tuple[trpx3] = PX[2];
+   tuple[trpy3] = PY[2];
+   tuple[trpz3] = PZ[2];
+   tuple[trte4] = PE[3];
+   tuple[trpx4] = PX[3];
+   tuple[trpy4] = PY[3];
+   tuple[trpz4] = PZ[3];
+   tuple[ftrte1] = FPE[0];
+   tuple[ftrpx1] = FPX[0];
+   tuple[ftrpy1] = FPY[0];
+   tuple[ftrpz1] = FPZ[0];
+   tuple[ftrte2] = FPE[1];
+   tuple[ftrpx2] = FPX[1];
+   tuple[ftrpy2] = FPY[1];
+   tuple[ftrpz2] = FPZ[1];
+   tuple[ftrte3] = FPE[2];
+   tuple[ftrpx3] = FPX[2];
+   tuple[ftrpy3] = FPY[2];
+   tuple[ftrpz3] = FPZ[2];
+   tuple[ftrte4] = FPE[3];
+   tuple[ftrpx4] = FPX[3];
+   tuple[ftrpy4] = FPY[3];
+   tuple[ftrpz4] = FPZ[3];
+   tuple[id1] = ID[0];
+   tuple[id2] = ID[1];
+   tuple[id3] = ID[2];
+   tuple[id4] = ID[3];
+   tuple[charge1] = CHARGE[0];
+   tuple[charge2] = CHARGE[1];
+   tuple[charge3] = CHARGE[2];
+   tuple[charge4] = CHARGE[3];
+   tuple[passed1] = PASSED1;
+   tuple[passed2] = PASSED2;
+   tuple[passed3] = PASSED3;
+   tuple[passed4] = PASSED4;
+   tuple[peak1] = PEAK1;
+   tuple[peak2] = PEAK2;
+   tuple[peak3] = PEAK3;
+   tuple[peak4] = PEAK4;
+
+
+   (*m_showerTuple).fill(tuple);
+
+
+   return ActionBase::kPassed;
+}
+
+
+ActionBase::ActionResult
+XX3872Proc::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   FAItem< MagneticField > cleoBField;
+   extract( iFrame.record( Stream::kBeginRun ), cleoBField );
+
+   FitEvtSettings &settings(FitEvtSettings::instance());
+   settings.setField(*cleoBField);
+   settings.setBeamSpot(*spot);
+   settings.setLorVecCM( beam_energy->value() );
+//   settings.setVerbose();
+
+
+   return ActionBase::kPassed;
+}
+
+
+/*
+ActionBase::ActionResult
+XX3872Proc::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

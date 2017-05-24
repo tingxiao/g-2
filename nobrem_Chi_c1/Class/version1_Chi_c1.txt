@@ -1,0 +1,671 @@
+// -*- C++ -*-
+//
+// Package:     Chi_c1
+// Module:      Chi_c1
+// 
+// Description: <one line class summary>
+//
+// Implementation:
+//     <Notes on implementation>
+//
+// Author:      pts/7
+// Created:     Mon May  2 13:43:14 CDT 2011
+// $Id$
+//
+// Revision history
+//
+// $Log$
+//
+
+#include "Experiment/Experiment.h"
+
+// system include files
+
+// user include files
+#include "Chi_c1/Chi_c1.h"
+#include "Experiment/report.h"
+#include "Experiment/units.h"  // for converting to/from standard CLEO units
+#include "HistogramInterface/HINtupleVarNames.h"
+#include "HistogramInterface/HINtupleArray.h"
+#include "HistogramInterface/HIHist1D.h"
+
+#include "DataHandler/Record.h"
+#include "DataHandler/Frame.h"
+#include "FrameAccess/extract.h"
+#include "FrameAccess/FAItem.h"
+#include "FrameAccess/FATable.h"
+
+#include "Navigation/NavShower.h"
+#include "C3cc/CcShowerAttributes.h"
+#include "Navigation/NavShowerServer.h"
+#include "C3ccProd/CcFortranShowerCorrector.h"
+
+//I added the following at the suggestion of the NavShower web page
+#include "Navigation/NavConReg.h"
+#include "KinematicTrajectory/KTKinematicData.h"
+#include "Navigation/NavTkShMatch.h"
+#include "C3cc/CcAssignedEnergyHit.h"
+
+#include "Navigation/NavTrack.h"
+#include "TrackRoot/TRHelixFit.h"
+#include "TrackRoot/TRTrackFitQuality.h"
+#include "TrackRoot/TRSeedTrackQuality.h"
+#include "TrackDelivery/TDKinematicFit.h"
+#include "Navigation/NavElecId.h"
+
+#include "FitEvt/FitEvtSettings.h"
+#include "FitEvt/FitEvt.h"
+#include "BeamEnergy/BeamEnergy.h"
+#include "MagField/MagneticField.h"
+#include "MagField/MFFieldMap.h"
+#include "BeamSpot/BeamSpot.h"
+
+#include "Navigation/NavPi0ToGG.h"
+#include "Navigation/NavEtaToGG.h"
+#include "PhotonDecays/PhdPi0.h"
+#include "PhotonDecays/PhdEtaToGG.h"
+#include "Navigation/NavTkShMatch.h"
+#include <PhotonDecays/PhdPi0.h>
+#include <CleoDB/DBEventHeader.h>
+
+#include "CleoDB/DBEventHeader.h"
+#include "TriggerData/TriggerData.h"
+#include "TriggerL1Data/TriggerL1Data.h"
+#include "Level4Proc/Level4Decision.h"
+
+//RICH example
+#include "Navigation/NavRich.h"
+//Dedx example
+#include "DedxInfo/DedxInfo.h"
+
+
+
+// STL classes
+// You may have to uncomment some of these or other stl headers 
+// depending on what other header files you include (e.g. FrameAccess etc.)!
+//#include <string>
+//#include <vector>
+//#include <set>
+//#include <map>
+//#include <algorithm>
+//#include <utility>
+
+//
+// constants, enums and typedefs
+//
+static const char* const kFacilityString = "Processor.Chi_c1" ;
+
+// ---- cvs-based strings (Id and Tag with which file was checked out)
+static const char* const kIdString  = "$Id: processor.cc,v 1.41 2006/02/08 19:38:02 wsun Exp $";
+static const char* const kTagString = "$Name: v07_03_00 $";
+
+//
+// static data member definitions
+//
+
+
+
+//
+// constructors and destructor
+//
+Chi_c1::Chi_c1( void )               // anal1
+   : Processor( "Chi_c1" )
+{
+   report( DEBUG, kFacilityString ) << "here in ctor()" << endl;
+
+   // ---- bind a method to a stream -----
+   // These lines ARE VERY IMPORTANT! If you don't bind the 
+   // code you've just written (the "action") to a stream, 
+   // your code won't get executed!
+
+   bind( &Chi_c1::event,    Stream::kEvent );
+   bind( &Chi_c1::beginRun, Stream::kBeginRun );
+   //bind( &Chi_c1::endRun,   Stream::kEndRun );
+
+   // do anything here that needs to be done at creation time
+   // (e.g. allocate resources etc.)
+
+
+}
+
+Chi_c1::~Chi_c1()                    // anal5
+{
+   report( DEBUG, kFacilityString ) << "here in dtor()" << endl;
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+}
+
+//
+// member functions
+//
+
+// ------------ methods for beginning/end "Interactive" ------------
+// --------------------------- init method -------------------------
+void
+Chi_c1::init( void )          // anal1 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in init()" << endl;
+
+   // do any initialization here based on Parameter Input by User
+   // (e.g. run expensive algorithms that are based on parameters
+   //  specified by user at run-time)
+
+}
+
+// -------------------- terminate method ----------------------------
+void
+Chi_c1::terminate( void )     // anal5 "Interactive"
+{
+   report( DEBUG, kFacilityString ) << "here in terminate()" << endl;
+
+   // do anything here BEFORE New Parameter Change
+   // (e.g. write out result based on parameters from user-input)
+ 
+}
+
+
+// ---------------- standard place to book histograms ---------------
+
+enum {
+chisqv1,chisqf1,         // chisq of J/psi mass constraint fit
+chisqv2,chisqf2,         // chisq of 4C fit
+id1,id2,                 // identifier of photon, just for check temporarily
+e1,th1,phi1,de1,dth1,dphi1,  // unfitted photon energy 
+e2,th2,phi2,de2,dth2,dphi2,        
+fe1,fth1,fphi1,       // fitted photon energy 
+fe2,fth2,fphi2,
+
+e_beam,         // beam energy
+
+eop1,eop2,me1,me2,
+trte1,trpx1,trpy1,trpz1,trmag1,trte2,trpx2,trpy2,trpz2,trmag2,
+ftrte1,ftrpx1,ftrpy1,ftrpz1,ftrte2,ftrpx2,ftrpy2,ftrpz2,
+charge1,charge2,trid1,trid2,  // e: trid=1; mu: trid=2;
+kVarNum};
+
+
+
+
+void
+Chi_c1::hist_book( HIHistoManager& iHistoManager )
+{
+   report( DEBUG, kFacilityString ) << "here in hist_book()" << endl;
+
+   // book your histograms here
+
+   HINtupleVarNames ntupleNames(kVarNum);
+
+   ntupleNames.addVar(chisqv1,       "chisqv1");
+   ntupleNames.addVar(chisqf1,       "chisqf1");
+   ntupleNames.addVar(chisqv2,       "chisqv2");
+   ntupleNames.addVar(chisqf2,       "chisqf2");
+
+   ntupleNames.addVar(id1,           "id1");
+   ntupleNames.addVar(id2,           "id2");
+
+   ntupleNames.addVar(e1,            "e1");
+   ntupleNames.addVar(th1,           "th1");
+   ntupleNames.addVar(phi1,          "phi1");
+   ntupleNames.addVar(de1,           "de1");
+   ntupleNames.addVar(dth1,          "dth1");
+   ntupleNames.addVar(dphi1,         "dphi1");
+
+   ntupleNames.addVar(e2,            "e2");
+   ntupleNames.addVar(th2,           "th2");
+   ntupleNames.addVar(phi2,          "phi2");
+   ntupleNames.addVar(de2,           "de2");
+   ntupleNames.addVar(dth2,          "dth2");
+   ntupleNames.addVar(dphi2,         "dphi2");
+
+   ntupleNames.addVar(fe1,          "fe1");
+   ntupleNames.addVar(fth1,         "fth1");
+   ntupleNames.addVar(fphi1,        "fphi1");
+
+   ntupleNames.addVar(fe2,          "fe2");
+   ntupleNames.addVar(fth2,         "fth2");
+   ntupleNames.addVar(fphi2,        "fphi2");
+
+   ntupleNames.addVar(e_beam,       "e_beam");
+
+   ntupleNames.addVar(eop1,         "eop1");
+   ntupleNames.addVar(eop2,         "eop2");
+   ntupleNames.addVar(me1,          "me1");
+   ntupleNames.addVar(me2,          "me2");
+
+   ntupleNames.addVar(trte1,        "trte1");
+   ntupleNames.addVar(trpx1,        "trpx1");
+   ntupleNames.addVar(trpy1,        "trpy1");
+   ntupleNames.addVar(trpz1,        "trpz1");
+   ntupleNames.addVar(trmag1,       "trmag1");
+
+   ntupleNames.addVar(trte2,        "trte2");
+   ntupleNames.addVar(trpx2,        "trpx2");
+   ntupleNames.addVar(trpy2,        "trpy2");
+   ntupleNames.addVar(trpz2,        "trpz2");
+   ntupleNames.addVar(trmag2,       "trmag2");
+
+   ntupleNames.addVar(ftrte1,       "ftrte1");
+   ntupleNames.addVar(ftrpx1,       "ftrpx1");
+   ntupleNames.addVar(ftrpy1,       "ftrpy1");
+   ntupleNames.addVar(ftrpz1,       "ftrpz1");
+   ntupleNames.addVar(ftrte2,       "ftrte2");
+   ntupleNames.addVar(ftrpx2,       "ftrpx2");
+   ntupleNames.addVar(ftrpy2,       "ftrpy2");
+   ntupleNames.addVar(ftrpz2,       "ftrpz2");
+
+   ntupleNames.addVar(charge1,      "charge1");
+   ntupleNames.addVar(charge2,      "charge2");
+   ntupleNames.addVar(trid1,        "trid1");
+   ntupleNames.addVar(trid2,        "trid2");
+
+   m_showerTuple = iHistoManager.ntuple(10,"tuple", kVarNum, 10000, ntupleNames.names());
+
+}
+
+// --------------------- methods bound to streams -------------------
+ActionBase::ActionResult
+Chi_c1::event( Frame& iFrame )          // anal3 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in event()" << endl;
+
+   double ChisqV1 = -10.;
+   double ChisqF1 = -10.;
+   double ChisqV2 = -10.;
+   double ChisqF2 = -10.;
+
+   double ID[2] = {-10.,-10.};
+
+   double E[2] = {-10.,-10.};
+   double Theta[2] = {-10.,-10.};
+   double Phi[2] = {-10.,-10.};
+   double DE[2] = {-10.,-10.};
+   double DTheta[2] = {-10.,-10.};
+   double DPhi[2] = {-10.,-10.};
+
+   double FE[2] = {-10.,-10.};
+   double FTheta[2] = {-10.,-10.};
+   double FPhi[2] = {-10.,-10.};
+
+   double E_BEAM = -10.;
+
+   double ME[2] = {-10.,-10.};
+   double EOP[2] = {-10.,-10.};
+
+   double PE[2] = {-10.,-10.};
+   double PX[2] = {-10.,-10.};
+   double PY[2] = {-10.,-10.};
+   double PZ[2] = {-10.,-10.};
+   double PMAG[2] = {-10.,-10.};
+
+   double FPE[2] = {-10.,-10.};
+   double FPX[2] = {-10.,-10.};
+   double FPY[2] = {-10.,-10.};
+   double FPZ[2] = {-10.,-10.};
+
+   double CHARGE[2] = {-10.,-10.};
+   double TRID[2] = {-10.,-10.};
+
+   const double kJpsiMass = 3.096916;
+
+
+   float tuple[kVarNum];
+
+
+///////////////////////////////// beam energy ////////////////////////////////////
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   E_BEAM = beam_energy->value();
+
+////////////////////////////// # of tracks == 2 /////////////////////////////////
+
+   FATable< NavTrack > trackTable;
+   extract( iFrame.record( Stream::kEvent ) , trackTable, "GoodThings" );
+
+//   if(trackTable.size() != 2)
+//       return ActionBase::kFailed;
+
+   FATable< NavTrack >::const_iterator trackTableBegin = trackTable.begin();
+   FATable< NavTrack >::const_iterator trackTableEnd = trackTable.end();
+
+   FAItem<TDKinematicFit> tr[2];
+
+   int fittracks = 0;
+
+   for ( FATable< NavTrack >::const_iterator trackItr = trackTableBegin;
+         trackItr != trackTableEnd ;
+         ++trackItr )
+   {
+
+      FAItem<TDKinematicFit> muonFit = trackItr->muonFit();
+      FAItem<TDKinematicFit> electronFit = trackItr->electronFit();
+
+      if(trackItr.valid()) {
+
+        int i = fittracks++;
+
+        if(fittracks > 2)
+            return ActionBase::kFailed;
+
+        if(trackItr->trackShowerMatch().valid())
+           ME[i] = trackItr->trackShowerMatch()->matchedEnergy();
+
+        EOP[i] = trackItr->elecId().eOverP();
+
+        if(EOP[i]>0.7 && electronFit.valid() && electronFit->pmag() > 1.4) {
+
+          CHARGE[i]=electronFit->charge();
+          PE[i]=electronFit->energy();
+          PX[i]=electronFit->px();
+          PY[i]=electronFit->py();
+          PZ[i]=electronFit->pz();
+          PMAG[i]=electronFit->pmag();
+          tr[i]=electronFit;
+          TRID[i]=1;
+        }
+
+        else if(ME[i]>0.15 && ME[i]<0.55 && muonFit.valid() && muonFit->pmag() > 1.4) {
+
+          CHARGE[i]=muonFit->charge();
+          PE[i]=muonFit->energy();
+          PX[i]=muonFit->px();
+          PY[i]=muonFit->py();
+          PZ[i]=muonFit->pz();
+          PMAG[i]=muonFit->pmag();
+          tr[i]=muonFit;
+          TRID[i]=2;
+        }
+
+        else
+            return ActionBase::kFailed;
+
+      }
+   }
+
+   if(fittracks != 2)
+       return ActionBase::kFailed;
+
+   if(CHARGE[0] != -CHARGE[1])
+       return ActionBase::kFailed;
+
+   double m_ll = sqrt(pow((PE[0]+PE[1]),2)-pow((PX[0]+PX[1]),2)-pow((PY[0]+PY[1]),2)-pow((PZ[0]+PZ[1]),2));
+   if(fabs(m_ll-kJpsiMass) > 0.12)
+       return ActionBase::kFailed;
+
+
+///////////////////////////////////// # of showers = 2 ////////////////////////////////
+
+   FATable< NavShower > showerTable;
+   extract( iFrame.record( Stream::kEvent ) , showerTable, "GoodThings" );
+
+   if(showerTable.size() < 2)
+      return ActionBase::kFailed;
+
+   FATable< NavShower >::const_iterator showerBegin = showerTable.begin();
+   FATable< NavShower >::const_iterator showerEnd = showerTable.end();
+
+   FATable< NavShower >::const_iterator sh[2];
+
+
+   int fitphotons = 0;
+
+   for ( FATable< NavShower >::const_iterator showerItr = showerBegin;
+         showerItr != showerEnd ;
+         ++showerItr )
+      {
+
+       if(showerItr->attributes().e9oe25OK() &&  showerItr->attributes().goodBarrel() && showerItr->attributes().energy() > 0.06) {
+//       if(showerItr->attributes().goodBarrel() && showerItr->attributes().energy() > 0.06) {
+
+
+         int i = fitphotons++;
+
+         if(fitphotons > 2)
+            return ActionBase::kFailed;
+
+         ID[i] = showerItr->identifier();
+         E[i] = showerItr->attributes().energy();
+         Theta[i] = showerItr->attributes().theta();
+         Phi[i] = showerItr->attributes().phi();
+         DE[i] = showerItr->attributes().errEnergy();
+         DTheta[i] = showerItr->attributes().errTheta();
+         DPhi[i] = showerItr->attributes().errPhi();
+         sh[i] = showerItr;
+
+
+         if(TRID[0] == 1) {
+	   double costh_gamma_e0 = (E[i]*sin(Theta[i])*cos(Phi[i])*PX[0] + E[i]*sin(Theta[i])*sin(Phi[i])*PY[0] + E[i]*cos(Theta[i])*PZ[0])
+                                  /(E[i]*PMAG[0]);
+           if(1-exp(-(E[i]-0.02)/0.03) < costh_gamma_e0)
+              return ActionBase::kFailed;
+         }
+
+         if(TRID[1] == 1) {
+           double costh_gamma_e1 = (E[i]*sin(Theta[i])*cos(Phi[i])*PX[1] + E[i]*sin(Theta[i])*sin(Phi[i])*PY[1] + E[i]*cos(Theta[i])*PZ[1])
+                                  /(E[i]*PMAG[1]);
+           if(1-exp(-(E[i]-0.02)/0.03) < costh_gamma_e1)
+              return ActionBase::kFailed;
+         }
+
+       }
+     }
+
+   if(fitphotons != 2)
+      return ActionBase::kFailed;
+
+
+//////////////////////////////// photon not from pi0 ////////////////////////////////
+
+   FATable<NavPi0ToGG> pi0Table;
+   extract( iFrame.record( Stream::kEvent ) , pi0Table );
+
+   FATable< NavPi0ToGG >::const_iterator pi0Begin = pi0Table.begin();
+   FATable< NavPi0ToGG >::const_iterator pi0End = pi0Table.end();
+
+   for (FATable< NavPi0ToGG >::const_iterator pi0Itr = pi0Begin;
+        pi0Itr != pi0End ; ++pi0Itr) {
+
+     if(pi0Itr.valid()
+            && pi0Itr->pi0().fit()
+            && pi0Itr->pi0().converged()
+            && (pi0Itr->pi0().chisq() < 500)
+            && (fabs(pi0Itr->pi0().pullMass()) < 3) ) {
+        if(pi0Itr->hiEnShower().identifier() == ID[0] && pi0Itr->loEnShower().identifier() == ID[1])
+            return ActionBase::kFailed;
+        else if(pi0Itr->hiEnShower().identifier() == ID[1] && pi0Itr->loEnShower().identifier() == ID[0])
+            return ActionBase::kFailed;
+     }
+   }
+
+///////////////////////////////// photon not from eta /////////////////////////////////
+
+   FATable<NavEtaToGG> etaTable;
+   extract( iFrame.record( Stream::kEvent ) , etaTable );
+
+   FATable< NavEtaToGG >::const_iterator etaBegin = etaTable.begin();
+   FATable< NavEtaToGG >::const_iterator etaEnd = etaTable.end();
+
+   for (FATable< NavEtaToGG >::const_iterator etaItr = etaBegin;
+        etaItr != etaEnd ; ++etaItr) {
+
+     if(etaItr.valid()
+            && etaItr->eta().fit()
+            && etaItr->eta().converged()
+            && (etaItr->eta().chisq() < 500)
+            && (fabs(etaItr->eta().pullMass()) < 3) ) {
+        if(etaItr->hiEnShower().identifier() == ID[0] && etaItr->loEnShower().identifier() == ID[1])
+            return ActionBase::kFailed;
+        else if(etaItr->hiEnShower().identifier() == ID[1] && etaItr->loEnShower().identifier() == ID[0])
+            return ActionBase::kFailed;
+     }
+   }
+
+
+////////////////////////////////// total momentum < 50 MeV ///////////////////////////
+
+   double total_momentum = sqrt(pow((E[0]*sin(Theta[0])*cos(Phi[0])+PX[0]+E[1]*sin(Theta[1])*cos(Phi[1])+PX[1]),2)
+                               +pow((E[0]*sin(Theta[0])*sin(Phi[0])+PY[0]+E[1]*sin(Theta[1])*sin(Phi[1])+PY[1]),2)
+                               +pow((E[0]*cos(Theta[0])+PZ[0]+E[1]*cos(Theta[1])+PZ[1]),2)); 
+
+
+   if(fabs(total_momentum) > 0.15)
+        return ActionBase::kFailed;
+
+///////////////////////////////// kinematic fitting //////////////////////////////////
+
+
+   FitEvt jpsi( "Jpsi", FitEvt::k_Mass, 0, kJpsiMass );
+   jpsi.newTrack(*tr[0]);
+   jpsi.newTrack(*tr[1]);
+   jpsi.doTheFit();
+
+   if( (jpsi.chisqVtx()>0) && (jpsi.chisqFit()>0) ) {
+      ChisqV1 = jpsi.chisqVtx();
+      ChisqF1 = jpsi.chisqFit();
+
+      FitEvt psip( "Psip", FitEvt::k_P4VecCM );
+      psip.newPhoton(*sh[0]);
+      psip.newPhoton(*sh[1]);
+      psip.newKinDat(jpsi.fitResult());
+      psip.doTheFit();
+
+      if( (psip.chisqVtx()>0) && (psip.chisqFit()>0) ) {
+         ChisqV2 = psip.chisqVtx();
+         ChisqF2 = psip.chisqFit();
+
+         HepLorentzVector v0 (psip.kdFitVec()[0]->lorentzMomentum());
+         HepLorentzVector vg (psip.kdFitVec()[1]->lorentzMomentum());
+         HepLorentzVector v1 (jpsi.kdFitVec()[0]->lorentzMomentum());
+         HepLorentzVector v2 (jpsi.kdFitVec()[1]->lorentzMomentum());
+
+         FE[0] = v0.e();
+         FTheta[0] = v0.theta();
+         FPhi[0] = v0.phi();
+         FE[1] = vg.e();
+         FTheta[1] = vg.theta();
+         FPhi[1] = vg.phi();
+
+         FPE[0]=v1.e();
+         FPX[0]=v1.px();
+         FPY[0]=v1.py();
+         FPZ[0]=v1.pz();
+         FPE[1]=v2.e();
+         FPX[1]=v2.px();
+         FPY[1]=v2.py();
+         FPZ[1]=v2.pz();
+
+      }
+   }
+
+   tuple[chisqv1] = ChisqV1;
+   tuple[chisqf1] = ChisqF1;
+   tuple[chisqv2] = ChisqV2;
+   tuple[chisqf2] = ChisqF2;
+
+   tuple[id1] = ID[0];
+   tuple[id2] = ID[1];
+
+   tuple[e1] = E[0];
+   tuple[th1] = Theta[0];
+   tuple[phi1] = Phi[0];
+   tuple[e2] = E[1];
+   tuple[th2] = Theta[1];
+   tuple[phi2] = Phi[1];
+
+   tuple[de1] = DE[0];
+   tuple[dth1] = DTheta[0];
+   tuple[dphi1] = DPhi[0];
+   tuple[de2] = DE[1];
+   tuple[dth2] = DTheta[1];
+   tuple[dphi2] = DPhi[1];
+
+   tuple[fe1] = FE[0];
+   tuple[fth1] = FTheta[0];
+   tuple[fphi1] = FPhi[0];
+   tuple[fe2] = FE[1];
+   tuple[fth2] = FTheta[1];
+   tuple[fphi2] = FPhi[1];
+
+   tuple[e_beam] = E_BEAM;
+
+   tuple[charge1] = CHARGE[0];
+   tuple[charge2] = CHARGE[1];
+   tuple[eop1] = EOP[0];
+   tuple[eop2] = EOP[1];
+   tuple[me1] = ME[0];
+   tuple[me2] = ME[1];
+   tuple[trte1] = PE[0];
+   tuple[trpx1] = PX[0];
+   tuple[trpy1] = PY[0];
+   tuple[trpz1] = PZ[0];
+   tuple[trmag1] = PMAG[0];
+   tuple[trte2] = PE[1];
+   tuple[trpx2] = PX[1];
+   tuple[trpy2] = PY[1];
+   tuple[trpz2] = PZ[1];
+   tuple[trmag2] = PMAG[1];
+
+   tuple[ftrte1] = FPE[0];
+   tuple[ftrpx1] = FPX[0];
+   tuple[ftrpy1] = FPY[0];
+   tuple[ftrpz1] = FPZ[0];
+   tuple[ftrte2] = FPE[1];
+   tuple[ftrpx2] = FPX[1];
+   tuple[ftrpy2] = FPY[1];
+   tuple[ftrpz2] = FPZ[1];
+
+   tuple[trid1] = TRID[0];
+   tuple[trid2] = TRID[1];
+
+   (*m_showerTuple).fill(tuple);
+
+
+   return ActionBase::kPassed;
+}
+
+
+ActionBase::ActionResult
+Chi_c1::beginRun( Frame& iFrame )       // anal2 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in beginRun()" << endl;
+
+   FAItem< BeamSpot > spot;
+   extract( iFrame.record( Stream::kBeginRun ), spot );
+
+   FAItem< BeamEnergy > beam_energy;
+   extract( iFrame.record( Stream::kBeginRun ), beam_energy );
+
+   FAItem< MagneticField > cleoBField;
+   extract( iFrame.record( Stream::kBeginRun ), cleoBField );
+
+   FitEvtSettings &settings(FitEvtSettings::instance());
+   settings.setField(*cleoBField);
+   settings.setBeamSpot(*spot);
+   settings.setLorVecCM( beam_energy->value() );
+//   settings.setVerbose();
+
+
+   return ActionBase::kPassed;
+}
+
+
+/*
+ActionBase::ActionResult
+Chi_c1::endRun( Frame& iFrame )         // anal4 equiv.
+{
+   report( DEBUG, kFacilityString ) << "here in endRun()" << endl;
+
+   return ActionBase::kPassed;
+}
+*/
+
+//
+// const member functions
+//
+
+//
+// static member functions
+//

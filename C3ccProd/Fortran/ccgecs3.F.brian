@@ -1,0 +1,665 @@
+*
+* $Id: ccgecs3.F,v 1.8 2008/02/19 17:21:43 bkh Exp $
+*
+* $Log: ccgecs3.F,v $
+* Revision 1.8  2008/02/19 17:21:43  bkh
+* Separate Endcap energy fix from mc smearing & error-inflation fix
+*
+* Revision 1.7  2008/01/08 16:07:24  bkh
+* Better ccgecs for endcaps
+*
+* Revision 1.6  2008/01/04 18:30:57  bkh
+* Endcap Fix to ccgecs3
+*
+* Revision 1.5  2007/07/09 14:03:14  bkh
+* For solaris, fix random number interface in ccgecs3 for extra cc smearing
+*
+* Revision 1.4  2007/03/20 13:35:23  bkh
+* strong typing for new variables in ccgecs3
+*
+* Revision 1.3  2007/03/20 12:33:14  bkh
+* Fix bug in ccgecs3
+*
+* Revision 1.2  2007/03/19 16:36:39  bkh
+* Protect sqrt in ccgecs3 to be conservative
+*
+* Revision 1.1  2007/03/18 13:42:15  bkh
+* Move fortran routines from C3cc
+*
+* Revision 1.22  2007/03/16 15:01:23  bkh
+* Allow flag-controlled increase in sigmas, smearing in MC
+*
+* Revision 1.21  2004/11/29 19:55:29  cdj
+* now get report.inc from FortranReport
+*
+* Revision 1.20  2004/01/26 17:28:17  bkh
+* New CC enr-dep calibration; stor helpers for rungains & hot list
+*
+* Revision 1.19  2002/06/19 18:32:32  selina
+* Fine-tuning energy-dependent correction for MC and data based on data16
+*
+* Revision 1.18  2002/05/12 00:25:29  selina
+* Update energy-dependent correction for data (for both barrel and endcap); note that rings > 10 now have barrel correction.
+*
+* Revision 1.17  2001/11/26 14:52:27  bkh
+* Fix MC correction at low energy
+*
+* Revision 1.16  2001/11/19 21:47:59  selina
+* Update ring8 and ring12 correction and update energy resolution from MC
+*
+* Revision 1.15  2001/11/06 02:15:24  selina
+* use barrel energy correction for ring 12
+*
+* Revision 1.14  2001/11/05 15:15:53  selina
+* Add MC shower energy and ring 8 corrections
+*
+* Revision 1.13  2001/08/31 01:30:53  selina
+* Undo new MC shower energy corrections
+*
+* Revision 1.11  2001/07/23 20:01:34  bkh
+* Prepare routine for new corrections
+*
+* Revision 1.10  2001/07/23 17:46:24  bkh
+* SAVE an important array
+*
+* Revision 1.9  2001/07/23 17:41:50  bkh
+* Use new run gains
+*
+* Revision 1.8  2001/06/04 07:00:07  bkh
+* Add correction for MC endcap
+*
+* Revision 1.7  2001/05/24 21:14:23  bkh
+* Put in nominal (cleo2) MC energy correction if MC
+*
+* Revision 1.6  2001/05/17 19:48:29  bkh
+*  Add nominal MC correction
+*
+* Revision 1.5  2001/03/08 19:06:54  bkh
+* Small adjustments to some ring's energy normalizations
+*
+* Revision 1.4  2001/01/26 23:03:21  bkh
+* Fine tune shower energy normalization in barrel and endcap;
+* should now generally be accurate to about 0.5 percent.
+*
+* Revision 1.3  2000/10/27 21:03:47  bkh
+* Improve ring corrections
+*
+* Revision 1.2  2000/10/26 15:54:50  bkh
+* Slightly shift ring energy corrections
+*
+* Revision 1.1  2000/06/20 20:37:11  bkh
+* Rename ccgecs to ccgecs3 to avoid conflict with cleo2 version
+*
+* Revision 1.8  2000/06/14 21:22:09  bkh
+* Re-insert energy errors for non-good barrel
+*
+* Revision 1.7  2000/05/25 20:45:36  bkh
+* Tweak overall scale and position dependent corrections
+*
+* Revision 1.6  2000/05/23 19:39:22  bkh
+* tweak position dependent shower energy corrections
+*
+* Revision 1.5  2000/05/19 20:44:39  bkh
+* Improve position-dependent energy correction
+*
+* Revision 1.4  2000/05/17 19:59:48  bkh
+* Improve position dependent corrections
+*
+* Revision 1.3  2000/05/16 20:48:22  bkh
+* Fix bug for barrel energy correction
+*
+* Revision 1.2  2000/05/16 18:37:14  bkh
+* Changes associated with correcting shower energies vs position
+*
+* Revision 1.1  1999/06/30 18:20:11  bkh
+* moved from Ccfc
+*
+* Revision 1.1.1.1  1998/07/03 19:01:07  bkh
+* import Ccfc sources
+*
+* Revision 1.3  1998/02/25 18:35:14  clib
+* Final version from SLEE.
+*
+* Revision 1.2  1998/02/13 21:15:09  clib
+* Modification for the energies of recompressed MC showers. (slee)
+*
+* Revision 1.1.1.1  1994/10/04 21:24:06  zfiles
+* first version of ccc in CVS
+*
+*
+*CMZ :          25/02/98  11.42.17  by  Brian K. Heltsley and Sang-Joon Lee
+* add MC energy correction for recompress MC for BB, OV, and GE
+*CMZ :          13/02/98  13.45.34  by  Brian K. Heltsley and Sang-Joon Lee
+* fix MC energy correction for recompress MC
+*CMZ :  1.01/37 02/09/92  13.20.29  by  Brian K. Heltsley
+* FIX bug for MC energy correction
+*CMZ :  1.01/36 24/02/92  15.18.22  by  Brian Heltsley
+* put in fudge factor for energy dependent MC calibration
+*CMZ :          24/01/92  11.02.10  by  B. Heltsley
+* protect against neg sqr roots
+*CMZ :          25/11/91  09.35.53  by  B. Heltsley
+* fix bug in 36-43 range
+*CMZ :          08/10/91  11.12.30  by  B. Heltsley
+* fix in 36-43 degrees
+*CMZ :          24/06/91  11.35.59  by  B. Heltsley
+*CMZ :          20/05/91  17.33.52  by  B. Heltsley
+* speed up a little bit
+*CMZ :          02/04/91  09.31.52  by  B. Heltsley
+* chg energy correction to agree better with pi-zero correction.
+*CMZ :          14/03/91  14.14.22  by  B. Heltsley
+*-- Author :    B. Heltsley   27/02/91
+      SUBROUTINE CCGECS3( ENRINP, THETA, PHI, RING,
+     *                    ENROUT, ENRSIG, THESIG, PHISIG, LISMC,
+     *                    BAGAIN, ECGAIN, lfixit, lfixend )
+C.......................................................................
+C.
+C. CCGECS - Get gamma energy, sigmas as a fcn of energy and polar angle
+C.
+C. Inputs    : ENRINP - energy of photon on input (GeV)
+C.           : THETA  - angle of shower (radians)
+C.           : PHI    - angle of shower (radians)
+C.             LISMC  - true for MC, false for data
+C. Outputs   : ENROUT - energy of photon as corrected (GeV)
+C.             ENRSIG - sigma of energy (GeV)
+C.             THESIG - sigma of theta
+C.             PHISIG - sigma of phi
+C.
+C. COMMON    : None
+C. Banks     : None
+C.
+C. Calls     : None
+C. Called    : <anybody>
+C. Author    : B. Heltsley  27/02/91  17.12.58
+C.
+C. Detailed description
+C.  Based on theta and energy give out a corrected energy and sigmas.
+C.......................................................................
+#if defined(CLEO_TYPECHEK)
+      IMPLICIT NONE
+#endif
+* -------------------- Argument declarations ---------------
+
+      REAL ENRINP, THETA, ENROUT, ENRSIG, THESIG, PHISIG, PHI,
+     *     BAGAIN, ECGAIN
+      integer ring
+      logical lismc, lfixit, lfixend
+
+* -------------------- EXTERNAL declarations ---------------
+* None
+* -------------------- SEQUENCE declarations ---------------
+
+* -------------------- Local    declarations ---------------
+      LOGICAL RCSINI
+      CHARACTER*(*) CHRCSS, CHRCSR, CHRCST, CHRCSD, CHRCSA
+      PARAMETER(CHRCSS='$RCSfile: ccgecs3.F,v $')
+      PARAMETER(CHRCSR='$Revision: 1.8 $')
+      PARAMETER(CHRCST='$State: Exp $')
+      PARAMETER(CHRCSD='$Date: 2008/02/19 17:21:43 $')
+      PARAMETER(CHRCSA='$Author: bkh $')
+*
+      CHARACTER*(*) CRNAME
+      PARAMETER(    CRNAME = 'CCGECS' )
+*
+#include "FortranReport/report.inc"
+
+      character*80 mymes
+
+      LOGICAL INIT
+
+      REAL        PI,             PI2,         RAD
+      PARAMETER ( PI = 3.1415927, PI2 = PI/2., RAD = 180./PI )
+
+      REAL TH, E, THBL, PHBL, AA
+
+      REAL        ANG1,           ANG2,           ANG3
+      PARAMETER ( ANG1 = 40./RAD, ANG2 = 36./RAD, ANG3 = 32./RAD )
+
+      REAL        ANG4
+      PARAMETER ( ANG4 = 18./RAD )
+
+      INTEGER I, DTYP
+
+      REAL SQENRO, ECORR1( 1100 ), EESIG1( 1100 ), ECORRE( 1100 ),
+     *     AA1( 1100 ), BB1( 1100 ), ECORR2( 1100 ), EESIG2( 1100 ),
+     *     THSIG2( 1100 ), PHSIG2( 1100 ), RDUM, FMC( 1100 ), 
+     *     efmc(1100), tfmc( 1100 )
+
+*----------------
+* for MC energy correction
+      REAL    val, vale, valt
+      REAL    val2, vale2, valt2
+*----------------
+
+      real ale, fsig, gsig
+
+      integer nphp, nthp
+      parameter ( nphp = 11 , nthp = 10 )
+
+      real xphipc(nphp), fphipc(nphp),
+     *     xthtpc(nthp), fthtpc(nthp), thpo, phpo
+
+      real fthp, fphp
+
+      integer kpoc, jj, jring
+
+      real ringc(34), x1, x2, y1, y2, fc, sl
+
+      external random_module_gauss
+      real*8   random_module_gauss
+
+      real elog, elog2, elog3, elog4, elog5
+      real pp0, pp1, pp2, pp3, pp4, pp5
+
+* -------------------- SAVE     declarations ---------------
+      SAVE RCSINI
+
+      SAVE INIT, ECORR1, EESIG1, ECORRE, AA1, BB1, ECORR2, EESIG2, 
+     *     PHSIG2,THSIG2, FMC, ringc, xthtpc, xphipc, fphipc, fthtpc, 
+     *     efmc, tfmc, pp0, pp1, pp2, pp3, pp4, pp5
+
+* -------------------- DATA  initializations ---------------
+      DATA RCSINI/.TRUE./
+
+      DATA INIT / .TRUE. /
+
+      data xphipc / -0.50, -.48, -.43, -0.36, -0.03,
+     *              0.   ,  .03, .36 , .43, 0.47 , 0.5   /
+      data fphipc / 0.966, 0.990, 1.002, 1.005, 1.006,
+     *              0.999, 1.006, 1.004, 0.999, 0.987, 0.969 /
+
+      data xthtpc / -0.5,-0.47, -0.26, -0.24, -0.02, 0.   ,
+     *              0.24 , 0.26 , 0.47 , 0.50 / 
+      data fthtpc / .987, 1.006, 1.004, 1.007, 1.000, 1.005,
+     *              1.002,1.008, 1.000, 0.969 /
+
+      data ringc/ 1.000, 1.000, 1.015, 1.012, 1.014,
+     *            1.016, 1.017, 1.020, 1.018, 1.056,
+     *            1.052, 1.015, 1.013, 1.010, 1.009,
+     *            1.008, 1.007, 1.007, 1.006, 1.005,
+     *            1.004, 1.003, 1.003, 1.003, 1.003,
+     *            1.003, 1.002, 1.002, 1.002, 1.002,
+     *            1.002, 1.002, 1.002, 1.004 / 
+
+      data pp0,pp1,pp2,pp3,pp4,pp5/
+     * 0.97947, 0, -2.14565e-3, 2.10625e-2, 6.36837e-3, 0/
+cc     *     0.97570, 5.97076e-3, 1.25152e-2, 1.24840e-2, -1.22851e-2,
+cc     *     -5.64087e-3/
+* ----------------- Executable code starts here ------------
+#if WRITE_RCS_INFO
+      IF(RCSINI)THEN
+        RCSINI = .FALSE.
+        WRITE(6,*)'-------- CVSinfo --------'
+        WRITE(6,*)CHRCSS
+        WRITE(6,*)CHRCSR//' '//CHRCST
+        WRITE(6,*)CHRCSD//' '//CHRCSA
+      ENDIF
+#endif
+*
+c      CALL CLGHED( 'DATTYP', CRNAME, DTYP, RDUM )
+
+      IF( INIT ) THEN
+
+         INIT = .FALSE.
+
+         mymes = 
+     1 'CC Energy-dependent calibration version of Oct 2008: BKH***'
+         call report( ms_info, crname, mymes )
+
+         mymes = 
+     1 '**FIX SHOWER ERRORS AND SMEAR MC** in this job: BKH FEB2008***'
+         if( lfixit ) call report( ms_info, crname, mymes )
+
+         mymes = 
+     1 '**FIX ENDCAP ENERGY SCALE** in this job: BKH FEB2008***'
+         if( lfixend ) call report( ms_info, crname, mymes )
+
+         mymes = 
+     1 'You should select PhotonDecaysProd: BKH FEB2008***'
+         if( lfixit.or.lfixend ) call report( ms_info, crname, mymes )
+
+         mymes = 
+     1 'You should select RandomModule: BKH FEB2008***'
+         if( lfixit ) call report( ms_info, crname, mymes )
+
+         DO 53 I = 1, 1100
+            IF( I .LE. 1000 ) THEN
+               E = 0.01 + ( FLOAT( I ) - 0.5 )*0.001
+            ELSE
+               E = 1.00 + ( FLOAT( I - 1000 ) - 0.5 )*0.050
+            ENDIF
+
+            SQENRO = SQRT( E )
+
+* ---- initial estimated correction for data ---------
+c            ECORR1( I ) = 1.0 - 0.003325*SQENRO
+c     *                        - 0.00039915/(E**1.31)
+
+c            ECORR1(I) = 0.990*ECORR1(I)
+
+c            IF( E .LT. 2.0 )
+c     *            ECORR1(I) = ECORR1(I)*( 0.9972 + 0.004*ALOG(E) )
+
+* ------- new correction for data -------- 
+* barrel correction:
+c            ECORR1( I ) = 1.8392-0.82184*E**(-0.0261937)
+c     *                  -0.0440126*E**(0.75443)
+c            IF(E .GT. 0.6)
+c     *           ECORR1( I ) = ECORR1(I)*(3.0198-2.0723*E**(0.016769)
+c     *                       + 0.0531076*E**(0.81517))
+c incorporate both d16 pi0 and eta for barrel correction:
+
+c            if(E.lt.0.1) then
+c               ecorr1( I ) = 1.0246 + 0.02547*LOG(E) 
+c            else if (E.lt.0.2) then
+c               ecorr1( I ) = 0.99589  + 0.01298*LOG(E)
+c            else if (E.lt.1.0) then
+c               ecorr1( I ) = 0.977 + 0.00124184*LOG(E)
+c            else
+c               ecorr1( I ) = 0.977 + 0.00341736*LOG(E)
+c            endif
+
+c bkh updated based on cbx 04-01
+
+c
+c            if(E.lt.0.1) then
+c               ecorr1( I ) = 1.0187 + 0.02419*LOG(E) 
+c            else if (E.lt.0.6) then
+c               ecorr1( I ) = 0.9848  + 0.009488*LOG(E)
+c            else if (E.lt.2.0) then
+c               ecorr1( I ) = 0.98
+c            else
+c               ecorr1( I ) = 0.9757 + 0.006213*LOG(E)
+c            endif
+
+            elog  = alog10( e )
+            elog2 = elog*elog
+            elog3 = elog2*elog
+            elog4 = elog2*elog2
+            elog5 = elog2*elog3
+            ecorr1( I ) = pp0 + pp1*elog  + pp2*elog2 + pp3*elog3
+     *                        + pp4*elog4 + pp5*elog5
+
+
+* endcap correction: 
+            if(.not.lfixend) then
+
+* this is now (2/2008) known to be wrong but for backward compatibility is saved
+
+              ECORRE( I ) = 1.8873 - 0.8835*E**0.00265314
+c updated correction based on data16 (upon modification from MC).
+
+              ECORRE( I ) = 1.0-0.0000567143*E+0.00193172/E**1.1922 
+
+c updated based on cbx 04-01
+              if( e.lt.0.4) then
+                ECORRE( I ) = 1.0-0.0000567143*E+0.00193172/E**1.1922 
+              else
+                ecorre( i ) = 1.0004 - 0.005822*log(e)
+              endif
+              ecorre(i)=1.011*ecorre(i)
+            else
+c updated bkh january 2008--this is now known to be a much better endcap calibration
+              if( e.lt.0.2 ) then
+                ECORRE( I ) = 1.045 + 0.070*alog10(e)
+              else
+                if( e.lt.0.4 ) then
+                  ECORRE( I ) = 1.0099 + 0.0199*alog10(e)
+                else
+                  if( e .lt. 1.0 ) then
+                    ecorre( i ) = 1.002
+                  else
+                    ecorre( i ) = 1.002 - 0.0118*alog10(e)
+                  endif
+                endif
+              endif
+              ecorre(i)=ecorre(i)*1.011
+            endif
+
+c            print *, e, ' ', alog10(e),' ', ecorre(i)
+
+*---------end correction for data-----------
+
+*            EESIG1( I ) = 0.0035*( E**( -0.75 ) ) + 0.019 - 0.001*E
+            EESIG1( I ) = 0.0060*( E**(-0.7309) ) + 0.0114 - 0.0001*E
+            AA1( I ) = -0.0106*ALOG( E ) + 0.017 + 0.0016*E
+     *                 + 6.E-8/(E**4)
+            IF( AA1( I ) .GT. 0.06 ) AA1( I ) = 0.06
+
+            BB1( I ) = 0.0034/SQENRO + 0.0036 - 0.00027*E
+            IF( BB1( I ) .GT. 0.018 ) BB1( I ) = 0.018
+
+            ECORR2( I ) = 1.007 - 0.005*( E**( -0.75 ) )
+*            EESIG2( I ) = 0.0026/E + 0.025
+            EESIG2( I ) = 0.0503*(E**(-0.2656)) - 0.0239 + 0.0025*E
+
+            PHSIG2( I ) = ( 0.0037/SQENRO + 0.0073 )
+            THSIG2( I ) = ( 0.0014/SQENRO + 0.0056 )
+
+c---------- MC correction
+
+            IF ( E .LT. 0.02 ) E = 0.02  ! If E < 20 MeV, set E = 20 MeV.
+
+*first correction:
+            val = LOG(E) + 0.37217
+            fmc(i) = 0.95696 + 0.0144140*val-0.00406197*val**2
+     >           -0.00191601*val**3 + 0.00029036*val**4 +
+     >           0.000372247*val**5
+
+            vale = LOG(E) + 0.37217
+            efmc(i) = 0.95868 + 0.0177622*vale -0.00612463*vale**2 -
+     >           0.00109088*vale**3 + 0.0000690227*vale**4 +
+     >           0.000336823*vale**5
+
+            valt = LOG(E) + 0.49018
+            tfmc(i) = 0.93819 + 0.0235410*valt -0.00507451*valt**2 -
+     >           0.00439250*valt**3 +0.000613611*valt**4 +
+     >           0.000790796*valt**5
+*second correction:
+            val2 = LOG(E*fmc(i)) - 0.5
+            fmc(i) = fmc(i)*(0.99596 +0.00370136*val2+0.0122429*val2**2-
+     >           0.00180546*val2**3-0.00658202*val2**4-
+     >           0.00226287*val2**5-0.000222409*val2**6)
+
+            vale2 = LOG(E*efmc(i)) - 0.5
+            efmc(i) = efmc(i)*(1.0016+0.00543629*vale2+
+     >           0.0153058*vale2**2-0.00169638*vale2**3-
+     >           0.00833554*vale2**4-0.00302863*vale2**5-
+     >           0.000311386*vale2**6)
+
+            valt2 = LOG(E*tfmc(i)) - 0.5
+            tfmc(i) = tfmc(i)*(1.0070+0.0114228*valt2+
+     >           0.0189754*valt2**2-0.00658407*valt2**3-
+     >           0.0126172*valt2**4-0.00408958*valt2**5-
+     >           0.000396374*valt2**6)
+
+*additional correction for low energy (based on d16 MC)
+            if (E.lt.0.03) then
+               fmc(i)=fmc(i)*(1.0729-2.4660*E)
+               fmc(i)=fmc(i)*(1.0441-1.4453*E)
+            else if (E.lt.0.05) then
+               fmc(i)=fmc(i)*(1.0117-0.66510*E+7.9309*E**2)
+            else if (E.lt.0.1) then
+               fmc(i)=fmc(i)*(0.98319+0.39247*E-1.8610*E**2)
+            else if (E.lt.0.2) then
+               fmc(i)=fmc(i)*(1.0031+0.0246538*E-0.18801*E**2)
+            else if (E.lt.1) then
+               fmc(i)=fmc(i)*
+     >              (1.0049-0.0268534*E+0.0224518*E**2)
+            else
+               fmc(i) = fmc(i)*1.0
+            endif
+                             
+            efmc(i)=efmc(i)*
+     >            (1.0-0.000542417*E+0.00262441/E**0.7487)
+            if (E.LT.0.05) THEN
+               if (E.lt.0.03) 
+     >             efmc(i)=efmc(i)*(1.1901-6.1209*E)
+               efmc(i)= efmc(i)*(1.1023-5.5844*E + 75.347*E**2)
+            else if (E.LT.0.07) THEN
+               efmc(i) = efmc(i)*(0.97481+0.42412*E)
+            else if (E.LT.0.5) THEN
+               efmc(i) =  efmc(i)*(1.0093-0.07928*E+0.10919*E**2)
+            else if (E.LT.1) THEN
+               efmc(i) = efmc(i)*(0.99247+0.00942459*E)
+            else if (E.LT.2.5) THEN
+               efmc(i) = efmc(i)*(1.0035-0.0016496*E)
+            else 
+               efmc(i)=efmc(i)*1.0
+            endif
+
+c            print *, '****e=',e,', fendcap=',efmc(i)
+
+c----------end MC correction
+            
+ 53      CONTINUE
+      ENDIF
+      
+      IF( THETA .GT. PI2 ) THEN
+         TH = PI - THETA
+      ELSE
+         TH = THETA
+      ENDIF
+
+      IF( ENRINP .GT. 0.01 ) THEN
+         E = ENRINP
+      ELSE
+         E = 0.01
+      ENDIF
+
+      IF( E .LT. 1.0 ) THEN
+         I = INT( ( E - 0.01 )/0.001 )
+         IF( I .LT. 1 ) I = 1
+         IF( I .GT. 1000 ) I = 1000
+      ELSE
+         I = INT( ( E - 1.00 )/0.050 ) + 1000
+         IF( I .LT. 1 ) I = 1
+         IF( I .GT. 1100 ) I = 1100
+      ENDIF
+
+
+      jring = ring
+      if( ring.gt. 34 ) jring = 69-ring
+
+      IF(  jring.gt.12 ) THEN
+        fphp = 1.
+        fthp = 1.
+
+        call ccpock( theta, phi, thpo, phpo, kpoc )
+
+        if( kpoc.gt.1 ) then
+
+          do jj = 1, nphp-1
+            if( phpo .ge. xphipc(jj) .and. phpo .lt. xphipc(jj+1) ) then
+              x1=xphipc(jj)
+              x2=xphipc(jj+1)
+              y1=fphipc(jj)
+              y2=fphipc(jj+1)
+              sl=(y2-y1)/(x2-x1)
+              fc= sl*phpo + (y1-sl*x1)
+
+              fphp = 1.005/fc
+              go to 100
+            endif
+          enddo
+          fphp = 1.
+  100     continue
+
+          do jj = 1, nthp-1
+            if( thpo .ge. xthtpc(jj) .and. thpo .lt. xthtpc(jj+1) ) then
+              x1=xthtpc(jj)
+              x2=xthtpc(jj+1)
+              y1=fthtpc(jj)
+              y2=fthtpc(jj+1)
+              sl=(y2-y1)/(x2-x1)
+              fc= sl*thpo + (y1-sl*x1)
+
+              fthp = 1.005/fc
+              go to 200
+            endif
+          enddo
+          fthp = 1.
+  200     continue
+        endif
+
+* barrel >43
+
+        ENROUT = E*fthp*fphp*1.002/ringc(jring)
+
+**         PHISIG = ( 0.0028/SQRT( ENROUT ) + 0.0019 )
+**         THESIG = 0.8*PHISIG*SIN( TH )
+
+* angle errors depend on where you are in a block
+
+        CALL CCBLOK( THETA, PHI, THBL, PHBL )
+
+        PHISIG = BB1( I ) - PHBL*PHBL*AA1( I )
+        IF( PHISIG .LT. 0.001 ) PHISIG = 0.001
+         
+        AA = AA1( I ) + 0.0045 - 0.0002*ENROUT
+        IF( AA .GT. 0.065 ) AA = 0.065
+
+        THESIG = ( BB1( I ) - THBL*THBL*AA )*SIN( TH )
+        IF( THESIG .LT. 0.001 ) THESIG = 0.001
+
+      else
+
+        enrout = e*1.002/ringc(jring)
+        if( jring .le. 8 ) enrout = 1.008*enrout
+        if( jring .ge. 9 ) enrout = 1.003*enrout
+
+*        enrout = enrout*( 1.013 - 0.0078*alog(e) )
+
+        PHISIG = PHSIG2( I )
+
+        THESIG = THSIG2( I )
+      endif
+
+      if (jring .gt. 11) then
+         ENRSIG = ENROUT*EESIG1( I )
+      else
+         ENRSIG = ENROUT*EESIG2( I )
+      endif
+
+C---------------------------------------------------------------------
+      if( lismc ) then
+
+c here correction for the MC
+
+        if(jring .eq. 8) then
+           enrout = 1.025*enrout
+           enrout = enrout*(0.9992-0.0099*LOG(enrout))
+        endif
+
+        if( jring .gt. 12 ) then 
+           enrout = enrout*fmc( i )
+        else if( jring .gt. 8 ) then
+           enrout = enrout*tfmc( i )
+        else
+           enrout = enrout*efmc( i )
+        endif
+      else
+
+c here correction for the data
+
+c        enrout = enrout*ecorr1( i )
+        if( jring .gt. 10) then
+          enrout = enrout*ecorr1( i )
+          enrout = enrout*bagain
+        else
+          enrout = enrout*ecorre( i )
+          enrout = enrout*ecgain
+        endif
+      endif
+
+      if( lfixit .and. jring.gt. 10 ) then
+        ale = alog10(enrout)
+        fsig = 1.15 - 0.1*ale
+        if( lismc ) then
+          gsig = sqrt( abs(fsig*fsig -1.0) )
+          enrout = enrout + random_module_gauss()*gsig*enrsig
+        endif
+        enrsig = fsig*enrsig
+      endif
+
+      RETURN
+      END
