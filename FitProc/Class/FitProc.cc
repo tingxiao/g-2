@@ -29,7 +29,6 @@
 #include "HistogramInterface/HINtupleArray.h"
 #include "HistogramInterface/HIHist1D.h"
 
-
 #include "DataHandler/Record.h"
 #include "DataHandler/Frame.h"
 #include "FrameAccess/extract.h"
